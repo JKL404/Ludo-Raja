@@ -165,7 +165,8 @@ async function createGame() {
   document.getElementById('waiting-room').style.display = 'block';
 
   // Show WiFi hint
-  document.getElementById('wifi-url').textContent = `http://<your-ip>:3000  (run: ipconfig getifaddr en0)`;
+  const wifiEl = document.getElementById('wifi-url');
+  if (wifiEl) wifiEl.textContent = `http://<your-ip>:3000  (run: ipconfig getifaddr en0)`;
 
   // Hide main card
   document.querySelector('.lobby-card').style.display = 'none';
