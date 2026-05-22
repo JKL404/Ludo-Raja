@@ -1,17 +1,22 @@
 {
-  "name": "ludo",
+  "name": "ludo-raja",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Premium real-time multiplayer Ludo game — local WiFi + Render cloud hosting",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": ["ludo", "multiplayer", "game", "socket.io", "real-time"],
+  "author": "JKL404",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "express": "^5.2.1",
     "socket.io": "^4.8.3"
   }
 }
+

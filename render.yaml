@@ -1,0 +1,24 @@
+# render.yaml — Render Blueprint
+# This file lets Render auto-configure everything.
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: ludo-raja
+    runtime: node
+    plan: free                        # Use free tier (upgrade anytime)
+    region: singapore                 # Pick closest to your users
+    branch: main
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health          # Render pings this to confirm service is up
+
+    # Environment variables injected at runtime
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        generateValue: false          # Render auto-injects PORT — do NOT set manually
+
+    # Auto-deploy on every push to main branch
+    autoDeploy: true

@@ -1,5 +1,5 @@
 // ============================================================
-// server.js — Express + Socket.IO local game server
+// server.js — Express + Socket.IO game server (Render-ready)
 // ============================================================
 const express = require('express');
 const http = require('http');
@@ -9,14 +9,34 @@ const GameRoom = require('./game/GameRoom');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
 
-const PORT = 3000;
+// ---- Render / reverse-proxy support ----
+// Trust the proxy so req.ip, req.protocol etc. are correct behind Render's load balancer
+app.set('trust proxy', 1);
+
+// Socket.IO — configured for Render:
+// • cors: wildcard so any origin (Render URL or custom domain) can connect
+// • transports: prefer WebSocket, fall back to polling (Render supports both)
+// • pingTimeout / pingInterval tuned for Render's 30s idle timeout
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 30000,
+  allowEIO3: true,
+});
+
+// Use PORT from environment (Render injects this) or 3000 for local dev
+const PORT = process.env.PORT || 3000;
 const rooms = {}; // roomCode → GameRoom
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
+
+// ---- Health check (required for Render) ----
+app.get('/health', (_req, res) => res.status(200).json({ status: 'ok', uptime: process.uptime() }));
 
 // ---- REST endpoints ----
 
@@ -140,13 +160,28 @@ io.on('connection', (socket) => {
 
 // ---- Start server ----
 server.listen(PORT, '0.0.0.0', () => {
+  const env = process.env.NODE_ENV || 'development';
   console.log('\n🎲 ==========================================');
   console.log('   Premium Ludo Game Server Running!');
+  console.log(`   Environment: ${env}`);
   console.log('==========================================');
   console.log(`   Local:    http://localhost:${PORT}`);
-  console.log(`   Network:  Run 'ipconfig getifaddr en0' to get your WiFi IP`);
-  console.log('   Share the network URL with friends on same WiFi!');
+  if (env !== 'production') {
+    console.log(`   Network:  Run 'ipconfig getifaddr en0' to get your WiFi IP`);
+    console.log('   Share the network URL with friends on same WiFi!');
+  } else {
+    console.log('   Deployed on Render — use your Render URL to play!');
+  }
   console.log('==========================================\n');
+});
+
+// ---- Graceful shutdown (Render sends SIGTERM on deploy/scale) ----
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received — shutting down gracefully');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 });
 
 function _generateCode() {
