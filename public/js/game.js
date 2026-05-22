@@ -39,6 +39,12 @@ const GameController = (() => {
     BoardRenderer.setMyColor(myColor);
     BoardRenderer.startAnimLoop();
 
+    // Handle window resize dynamically
+    window.addEventListener('resize', () => {
+      _resizeCanvas(canvas);
+      BoardRenderer.draw();
+    });
+
     // Init dice
     DiceUI.init();
 
@@ -91,7 +97,9 @@ const GameController = (() => {
 
     SocketClient.on('dice-rolled', ({ color, value, movable, tripleSix, noMoves, state }) => {
       currentState = state;
-      DiceUI.roll(value, () => {
+      const slot = slotConfig.find(s => s.color === color);
+      const displayName = slot?.isBot ? `Bot (${color})` : (color === myColor ? 'You' : slot?.name || color.toUpperCase());
+      DiceUI.roll(value, displayName, () => {
         BoardRenderer.setState(state, myColor === state.currentColor ? state.movableTokens : []);
         _updateUI(state, color, value, { tripleSix, noMoves, movable });
       });

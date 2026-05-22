@@ -120,9 +120,17 @@ function selectTheme(t) {
 
 // ---- Color selection ----
 function selectColor(c) {
+  const oldColor = selectedColor;
   selectedColor = c;
-  // Update host slot color
-  if (slotConfig[0]) { slotConfig[0].color = c; _renderSlots(); }
+  if (slotConfig[0]) {
+    // If the color c is already used by another slot, swap it with the old color
+    const existingIdx = slotConfig.findIndex((s, idx) => idx > 0 && s.color === c);
+    if (existingIdx !== -1) {
+      slotConfig[existingIdx].color = oldColor;
+    }
+    slotConfig[0].color = c;
+    _renderSlots();
+  }
   document.querySelectorAll('.color-grid .color-option').forEach(el => {
     el.classList.toggle('selected', el.dataset.color === c);
   });
@@ -202,6 +210,11 @@ function _setupSocketHandlers() {
   SocketClient.on('joined', ({ color, roomCode: rc }) => {
     sessionStorage.setItem('ludoColor', color);
     sessionStorage.setItem('ludoRoom', rc);
+  });
+
+  SocketClient.on('error', (data) => {
+    document.getElementById('waiting-room').style.display = 'none';
+    document.querySelector('.lobby-card').style.display = 'block';
   });
 
   SocketClient.on('room-updated', (info) => {

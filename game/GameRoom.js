@@ -39,6 +39,15 @@ class GameRoom {
     // Convert to bot if game is in progress
     if (this.status === 'playing' && this.colorMap[color] === socketId) {
       this.colorMap[color] = null; // null = bot controlling this color
+      
+      // If it is currently this color's turn, trigger bot play immediately!
+      if (this.game && this.game.currentColor === color) {
+        if (this.game.phase === 'rolling') {
+          this._handleBotTurnIfNeeded();
+        } else if (this.game.phase === 'moving') {
+          this._handleBotMoveIfNeeded(this.game.movableTokens.map(t => t.id));
+        }
+      }
     }
   }
 
@@ -170,18 +179,14 @@ class GameRoom {
     setTimeout(() => {
       if (!this.game || this.status !== 'playing') return;
       if (!this._isCurrentTurnBot()) return;
+      
+      const color = this.game.currentColor;
       // Bot rolls
       const result = this.game.rollDice();
       if (!result) return;
 
-      const color = this.game.playerColors[
-        (this.game.currentTurnIndex - 1 + this.game.playerColors.length) % this.game.playerColors.length
-      ] || this.game.currentColor;
-
       this.io.to(this.roomCode).emit('dice-rolled', {
-        color: this.game.playerColors[
-          (this.game.playerColors.indexOf(this.game.currentColor) - (result.noMoves || result.tripleSix ? 0 : 1) + this.game.playerColors.length) % this.game.playerColors.length
-        ] || color,
+        color,
         value: result.value,
         movable: result.movable,
         tripleSix: result.tripleSix || false,

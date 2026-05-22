@@ -82,6 +82,7 @@ const BoardRenderer = (() => {
   // ---- Main draw ----
   function draw() {
     if (!ctx) return;
+    cellSize = canvas.width / GRID;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     _drawBoard();
     if (gameState) _drawTokens();

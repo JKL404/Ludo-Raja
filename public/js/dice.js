@@ -29,7 +29,7 @@ const DiceUI = (() => {
     valueDisplay = document.getElementById('dice-value-display');
   }
 
-  function show(value) {
+  function show(value, playerName) {
     if (!diceEl) init();
     // Update all faces' pips
     const faces = diceEl.querySelectorAll('.dice-face');
@@ -50,13 +50,15 @@ const DiceUI = (() => {
     // Update value display
     if (valueDisplay) {
       const colors = { 1:'#94a3b8', 2:'#94a3b8', 3:'#94a3b8', 4:'#94a3b8', 5:'#94a3b8', 6:'#f5c842' };
-      valueDisplay.textContent = value === 6 ? '✨ SIX! ✨' : `rolled ${value}`;
+      const prefix = playerName ? `${playerName} ` : '';
+      valueDisplay.textContent = value === 6 ? `✨ ${prefix}SIX! ✨` : `${prefix}rolled ${value}`;
       valueDisplay.style.color = colors[value] || '#f0f0ff';
     }
   }
 
-  function roll(finalValue, onDone) {
+  function roll(finalValue, playerName, onDone) {
     if (!diceEl) init();
+    if (valueDisplay) valueDisplay.textContent = 'Rolling...';
     SoundEngine.play.diceRoll();
     diceEl.classList.add('rolling');
 
@@ -73,7 +75,7 @@ const DiceUI = (() => {
         clearInterval(interval);
         setTimeout(() => {
           diceEl.classList.remove('rolling');
-          show(finalValue);
+          show(finalValue, playerName);
           if (finalValue === 6) SoundEngine.play.six();
           if (onDone) onDone();
         }, 200);

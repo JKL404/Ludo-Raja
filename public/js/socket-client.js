@@ -21,6 +21,7 @@ const SocketClient = (() => {
     socket.on('error', (data) => {
       console.error('[Socket] Error:', data.message);
       showToast(data.message, 'error');
+      if (handlers.error) handlers.error(data);
     });
 
     // Game events — delegate to registered handlers

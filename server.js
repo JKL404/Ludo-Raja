@@ -76,6 +76,13 @@ io.on('connection', (socket) => {
         socket.emit('error', { message: 'Game already started' });
         return;
       }
+    } else {
+      // If lobby is waiting, make sure color isn't already taken by another human player
+      const existingSocketId = room.colorMap[color];
+      if (existingSocketId && room.players[existingSocketId] && existingSocketId !== socket.id) {
+        socket.emit('error', { message: `Color ${color.toUpperCase()} is already taken!` });
+        return;
+      }
     }
 
     socket.join(roomCode);
