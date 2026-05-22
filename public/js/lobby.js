@@ -259,6 +259,10 @@ function _setupSocketHandlers() {
 
   SocketClient.on('room-updated', (info) => {
     _renderPlayersList(info.players);
+    // Keep a color→name map in sessionStorage so game page always has real names
+    const nameMap = {};
+    (info.players || []).forEach(p => { nameMap[p.color] = p.name; });
+    sessionStorage.setItem('ludoPlayerNames', JSON.stringify(nameMap));
     const startBtn  = document.getElementById('start-btn');
     const startHint = document.getElementById('start-hint');
     if (startBtn) {

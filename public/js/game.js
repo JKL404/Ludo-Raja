@@ -8,6 +8,7 @@ const GameController = (() => {
   let roomCode = null;
   let theme    = 'galaxy';
   let slotConfig = [];
+  let playerNames = {}; // color → name, persisted from lobby
   let currentState = null;
   let isMyTurn = false;
 
@@ -22,11 +23,12 @@ const GameController = (() => {
     TimerUI.init();
 
     // Restore session
-    myColor  = sessionStorage.getItem('ludoColor')  || 'red';
-    myName   = sessionStorage.getItem('ludoName')   || 'Player';
-    roomCode = sessionStorage.getItem('ludoRoom')   || '';
-    theme    = sessionStorage.getItem('ludoTheme')  || 'galaxy';
-    slotConfig = JSON.parse(sessionStorage.getItem('ludoSlots') || '[]');
+    myColor     = sessionStorage.getItem('ludoColor')       || 'red';
+    myName      = sessionStorage.getItem('ludoName')        || 'Player';
+    roomCode    = sessionStorage.getItem('ludoRoom')        || '';
+    theme       = sessionStorage.getItem('ludoTheme')       || 'galaxy';
+    slotConfig  = JSON.parse(sessionStorage.getItem('ludoSlots')       || '[]');
+    playerNames = JSON.parse(sessionStorage.getItem('ludoPlayerNames') || '{}');
 
     // Apply theme
     document.documentElement.setAttribute('data-theme', theme);
@@ -94,17 +96,28 @@ const GameController = (() => {
 
   // ---- Socket handlers ----
   function _setupSocketHandlers() {
+    SocketClient.on('error', (data) => {
+      const msg = data?.message || 'Something went wrong';
+      showToast(msg, 'error');
+      setTimeout(() => { window.location.href = '/'; }, 2500);
+    });
+
     SocketClient.on('game-started', ({ slotConfig: sc, theme: t, state }) => {
       slotConfig = sc;
       theme = t;
       currentState = state;
+      // Refresh playerNames from the server's enriched slotConfig and persist
+      sc.forEach(s => { if (!s.isBot && s.name) playerNames[s.color] = s.name; });
+      sessionStorage.setItem('ludoPlayerNames', JSON.stringify(playerNames));
+      sessionStorage.setItem('ludoSlots', JSON.stringify(sc));
+      // Refresh card names in-place (handles reconnects)
+      _refreshCardNames();
       _applyState(state);
     });
 
     SocketClient.on('dice-rolled', ({ color, value, movable, tripleSix, noMoves, state }) => {
       currentState = state;
-      const slot = slotConfig.find(s => s.color === color);
-      const displayName = slot?.isBot ? `Bot (${color})` : (color === myColor ? 'You' : slot?.name || color.toUpperCase());
+      const displayName = color === myColor ? 'You' : _nameFor(color);
       DiceUI.roll(value, displayName, () => {
         BoardRenderer.setState(state, myColor === state.currentColor ? state.movableTokens : []);
         _updateUI(state, color, value, { tripleSix, noMoves, movable });
@@ -114,8 +127,7 @@ const GameController = (() => {
     SocketClient.on('token-moved', ({ color, tokenId, captured, reachedHome, extraTurn, win, state }) => {
       currentState = state;
 
-      const slot = slotConfig.find(s => s.color === color);
-      const name = slot?.isBot ? `Bot (${color})` : (color === myColor ? 'You' : slot?.name || color.toUpperCase());
+      const name = color === myColor ? 'You' : _nameFor(color);
 
       if (captured) {
         _addSystemMessage(`💥 ${name} captured ${captured.color.toUpperCase()}'s token!`);
@@ -144,8 +156,7 @@ const GameController = (() => {
       currentState = state;
       if (reason === 'timeout') {
         const color = state.currentColor;
-        const slot = slotConfig.find(s => s.color === color);
-        const name = slot?.isBot ? `Bot (${color})` : (color === myColor ? 'You' : slot?.name || color.toUpperCase());
+        const name = color === myColor ? 'You' : _nameFor(color);
         _addSystemMessage(`⏱️ ${name}'s turn timed out!`);
       }
       BoardRenderer.setState(state, myColor === state.currentColor ? state.movableTokens : []);
@@ -199,6 +210,14 @@ const GameController = (() => {
     _updateRollBtn(state);
   }
 
+  // Resolve a display name for any color, with layered fallbacks
+  function _nameFor(color) {
+    if (color === myColor) return myName;
+    const slot = slotConfig.find(s => s.color === color);
+    if (slot?.isBot) return `Bot (${color})`;
+    return slot?.name || playerNames[color] || color.toUpperCase();
+  }
+
   function _updateTurnUI(state) {
     const dot   = document.getElementById('turn-dot');
     const label = document.getElementById('turn-label');
@@ -207,8 +226,7 @@ const GameController = (() => {
     const color = state.currentColor;
     dot.className = `turn-dot ${color}`;
 
-    const slot = slotConfig.find(s => s.color === color);
-    const name = slot?.isBot ? `🤖 Bot (${color})` : (color === myColor ? `${myName} (YOU)` : color.toUpperCase());
+    const name = color === myColor ? `${myName} (YOU)` : _nameFor(color);
     label.textContent = state.phase === 'finished' ? '🏆 GAME OVER' : `${name}'s Turn`;
   }
 
@@ -237,7 +255,8 @@ const GameController = (() => {
   }
 
   function _updateRollBtn(state) {
-    const btn = document.getElementById('roll-btn');
+    const btn  = document.getElementById('roll-btn');
+    const wrap = document.getElementById('dice-3d-wrap');
     if (!btn) return;
     const s = state || currentState;
     if (!s) return;
@@ -246,9 +265,22 @@ const GameController = (() => {
     btn.disabled = !canRoll;
     btn.textContent = canRoll ? '🎲 ROLL' : (s.phase === 'moving' && myTurn ? '← Pick a token' : '⏳ Waiting…');
     isMyTurn = myTurn;
+    if (wrap) {
+      wrap.classList.toggle('dice-ready', canRoll);
+      if (canRoll) wrap.classList.remove('dice-rolling');
+    }
   }
 
   // ---- Player panels ----
+  // Update name labels in existing cards without rebuilding the whole panel
+  function _refreshCardNames() {
+    document.querySelectorAll('.player-card[data-color]').forEach(card => {
+      const color = card.dataset.color;
+      const nameEl = card.querySelector('.pc-name');
+      if (nameEl) nameEl.textContent = color === myColor ? myName : _nameFor(color);
+    });
+  }
+
   function _buildPlayerPanels() {
     const colors = slotConfig.map(s => s.color);
     const leftColors  = colors.filter((_, i) => i < 2);
@@ -266,7 +298,7 @@ const GameController = (() => {
 
   function _makePlayerCard(color) {
     const slot = slotConfig.find(s => s.color === color);
-    const name = slot?.isBot ? `Bot 🤖` : (color === myColor ? myName : (slot?.name || color));
+    const name = color === myColor ? myName : _nameFor(color);
     const div  = document.createElement('div');
     div.className = 'player-card';
     div.dataset.color = color;
@@ -289,8 +321,7 @@ const GameController = (() => {
     SoundEngine.play.win();
     ParticleSystem.celebrate(winnerColor);
 
-    const slot = slotConfig.find(s => s.color === winnerColor);
-    const winName = slot?.isBot ? `Bot (${winnerColor})` : (winnerColor === myColor ? myName : winnerColor.toUpperCase());
+    const winName = winnerColor === myColor ? myName : _nameFor(winnerColor);
 
     const overlay = document.getElementById('win-overlay');
     const nameEl  = document.getElementById('win-name');
@@ -349,8 +380,15 @@ const GameController = (() => {
     const s = currentState;
     if (!s || s.currentColor !== myColor || s.phase !== 'rolling') return;
     SoundEngine.resume();
-    const btn = document.getElementById('roll-btn');
-    if (btn) btn.disabled = true;
+    const btn  = document.getElementById('roll-btn');
+    const wrap = document.getElementById('dice-3d-wrap');
+    if (btn)  btn.disabled = true;
+    if (wrap) {
+      wrap.classList.remove('dice-ready');
+      wrap.classList.add('dice-rolling');
+      // Remove rolling class after animation completes so it can retrigger
+      setTimeout(() => wrap.classList.remove('dice-rolling'), 520);
+    }
     SocketClient.emit('roll-dice', {});
   }
 

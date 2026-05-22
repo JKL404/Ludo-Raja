@@ -173,7 +173,7 @@ io.on('connection', (socket) => {
 
     const state = await room.startGame(slotConfig, theme);
     io.to(roomCode).emit('game-started', {
-      slotConfig,
+      slotConfig: room.slotConfig, // enriched with real player names
       theme,
       state,
     });
