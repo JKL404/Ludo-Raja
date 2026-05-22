@@ -413,3 +413,40 @@
   transition: var(--transition);
 }
 .vol-toggle:hover { background: var(--bg-card); }
+
+/* ---- Waving Nepal Flag ---- */
+.waving-flag-container {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 12px;
+  width: clamp(40px, 7vw, 75px);
+  line-height: 0;
+  perspective: 800px;
+  transform-style: preserve-3d;
+}
+
+.nepal-flag-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+  transform-origin: left center;
+  animation: flag-swing 5s infinite ease-in-out alternate;
+}
+
+/* Force SVG elements to ignore the parent logo's gradient text filling */
+.nepal-flag-svg * {
+  -webkit-text-fill-color: initial !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
+}
+
+@keyframes flag-swing {
+  0% {
+    transform: rotateY(-8deg) rotateZ(-3deg);
+  }
+  100% {
+    transform: rotateY(16deg) rotateZ(3deg);
+  }
+}
+
