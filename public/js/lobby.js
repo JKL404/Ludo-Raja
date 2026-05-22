@@ -216,6 +216,11 @@ function _setupSocketHandlers() {
   SocketClient.on('error', (data) => {
     document.getElementById('waiting-room').style.display = 'none';
     document.querySelector('.lobby-card').style.display = 'block';
+    if (data && data.message === 'Room not found') {
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1500);
+    }
   });
 
   SocketClient.on('room-updated', (info) => {

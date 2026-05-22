@@ -113,9 +113,6 @@ const GameController = (() => {
 
     SocketClient.on('token-moved', ({ color, tokenId, captured, reachedHome, extraTurn, win, state }) => {
       currentState = state;
-      if (captured) SoundEngine.play.capture();
-      else if (reachedHome) SoundEngine.play.enterHome();
-      else SoundEngine.play.tokenMove();
 
       const slot = slotConfig.find(s => s.color === color);
       const name = slot?.isBot ? `Bot (${color})` : (color === myColor ? 'You' : slot?.name || color.toUpperCase());
@@ -127,7 +124,11 @@ const GameController = (() => {
         _addSystemMessage(`🏠 ${name} reached home!`);
       }
 
-      BoardRenderer.setState(state, myColor === state.currentColor ? state.movableTokens : []);
+      BoardRenderer.setState(state, myColor === state.currentColor ? state.movableTokens : [], {
+        animate: true,
+        captured,
+        reachedHome
+      });
       _updateTurnUI(state);
       _updatePlayerCards(state);
       _updateRollBtn(state);
