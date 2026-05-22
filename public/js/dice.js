@@ -51,7 +51,7 @@ const DiceUI = (() => {
     if (valueDisplay) {
       const colors = { 1:'#94a3b8', 2:'#94a3b8', 3:'#94a3b8', 4:'#94a3b8', 5:'#94a3b8', 6:'#f5c842' };
       const prefix = playerName ? `${playerName} ` : '';
-      valueDisplay.textContent = value === 6 ? `✨ ${prefix}SIX! ✨` : `${prefix}rolled ${value}`;
+      valueDisplay.textContent = value === 6 ? `✨ ${prefix}rolled a SIX! ✨` : `${prefix}rolled ${value}`;
       valueDisplay.style.color = colors[value] || '#f0f0ff';
     }
   }

@@ -20,12 +20,12 @@
   <div class="stars-bg" id="stars-bg"></div>
 
   <!-- Top HUD -->
-  <div style="position:relative;z-index:1;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;max-width:1100px;margin:0 auto;width:100%">
+  <div class="game-hud">
     <div class="turn-banner">
       <div class="turn-dot" id="turn-dot"></div>
-      <span id="turn-label" style="font-family:'Orbitron',monospace;font-size:0.85rem;">— — —</span>
+      <span id="turn-label">— — —</span>
     </div>
-    <div style="display:flex;align-items:center;gap:12px">
+    <div class="hud-controls">
       <div class="timer-wrap">
         <div class="timer-ring-container">
           <svg width="56" height="56" viewBox="0 0 56 56">
@@ -37,7 +37,7 @@
         </div>
       </div>
       <button class="vol-toggle" id="vol-toggle" title="Toggle Sound">🔊</button>
-      <button class="btn btn-ghost btn-sm" onclick="window.location='/'">← Lobby</button>
+      <button class="btn btn-ghost btn-sm" id="btn-lobby" onclick="window.location='/'">← Lobby</button>
     </div>
   </div>
 
@@ -68,7 +68,7 @@
               <div class="dice-face"><span class="pip"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip"></span></div>
             </div>
           </div>
-          <div id="dice-value-display" style="font-family:'Orbitron',monospace;font-size:1.6rem;font-weight:700;min-height:2rem;text-align:center"></div>
+          <div id="dice-value-display"></div>
           <button class="roll-btn" id="roll-btn" onclick="GameController.rollDice()" disabled>🎲 ROLL</button>
         </div>
       </div>

@@ -68,9 +68,15 @@ const GameController = (() => {
   }
 
   function _resizeCanvas(canvas) {
-    const size = Math.min(window.innerWidth - 440, window.innerHeight - 160, 600);
-    canvas.width  = Math.max(size, 300);
-    canvas.height = Math.max(size, 300);
+    let size;
+    if (window.innerWidth > 900) {
+      size = Math.min(window.innerWidth - 440, window.innerHeight - 180, 600);
+    } else {
+      size = Math.min(window.innerWidth - 32, window.innerHeight - 340, 500);
+    }
+    const finalSize = Math.max(size, 260);
+    canvas.width  = finalSize;
+    canvas.height = finalSize;
   }
 
   function _generateStars() {
@@ -111,8 +117,15 @@ const GameController = (() => {
       else if (reachedHome) SoundEngine.play.enterHome();
       else SoundEngine.play.tokenMove();
 
-      if (captured) showToast(`💥 ${color.toUpperCase()} captured ${captured.color}!`, 'info');
-      if (reachedHome) showToast(`🏠 ${color.toUpperCase()} reached home!`, 'success');
+      const slot = slotConfig.find(s => s.color === color);
+      const name = slot?.isBot ? `Bot (${color})` : (color === myColor ? 'You' : slot?.name || color.toUpperCase());
+
+      if (captured) {
+        _addSystemMessage(`💥 ${name} captured ${captured.color.toUpperCase()}'s token!`);
+      }
+      if (reachedHome) {
+        _addSystemMessage(`🏠 ${name} reached home!`);
+      }
 
       BoardRenderer.setState(state, myColor === state.currentColor ? state.movableTokens : []);
       _updateTurnUI(state);
@@ -122,14 +135,17 @@ const GameController = (() => {
       if (win) {
         _showWin(win, state);
       } else if (extraTurn) {
-        if (color === myColor) showToast('🎉 Extra turn!', 'success');
+        _addSystemMessage(`🎉 ${name} gets an extra turn!`);
       }
     });
 
     SocketClient.on('turn-skipped', ({ reason, state }) => {
       currentState = state;
       if (reason === 'timeout') {
-        showToast('⏱️ Turn timed out!', 'info');
+        const color = state.currentColor;
+        const slot = slotConfig.find(s => s.color === color);
+        const name = slot?.isBot ? `Bot (${color})` : (color === myColor ? 'You' : slot?.name || color.toUpperCase());
+        _addSystemMessage(`⏱️ ${name}'s turn timed out!`);
       }
       BoardRenderer.setState(state, myColor === state.currentColor ? state.movableTokens : []);
       _updateTurnUI(state);
@@ -164,15 +180,18 @@ const GameController = (() => {
     _updateTurnUI(state);
     _updatePlayerCards(state);
 
+    const slot = slotConfig.find(s => s.color === rolledColor);
+    const displayName = slot?.isBot ? `Bot (${rolledColor})` : (rolledColor === myColor ? 'You' : slot?.name || rolledColor.toUpperCase());
+
     if (tripleSix) {
       SoundEngine.play.tripleSix();
-      showToast('💀 Triple 6! Forfeit turn!', 'error');
+      _addSystemMessage(`💀 ${displayName} rolled triple 6 and forfeited their turn!`);
     }
     if (noMoves && !tripleSix) {
-      showToast(`${rolledColor.toUpperCase()} rolled ${value} — no moves!`, 'info');
+      _addSystemMessage(`🎲 ${displayName} rolled ${value} — no moves!`);
     }
     if (value === 6 && !tripleSix) {
-      if (rolledColor !== myColor) showToast(`${rolledColor.toUpperCase()} rolled a SIX! ✨`, 'info');
+      _addSystemMessage(`🎲 ${displayName} rolled a SIX! ✨`);
     }
 
     isMyTurn = state.currentColor === myColor && state.phase === 'moving';
@@ -301,6 +320,18 @@ const GameController = (() => {
     div.innerHTML = `
       <span class="chat-msg-name" style="color:${color}">${escapeHtml(name)}:</span>
       <span class="chat-msg-text">${escapeHtml(msg)}</span>
+    `;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function _addSystemMessage(msg) {
+    const log = document.getElementById('chat-log');
+    if (!log) return;
+    const div = document.createElement('div');
+    div.className = 'chat-msg system-msg';
+    div.innerHTML = `
+      <span class="chat-msg-text" style="color:var(--text-muted); font-style:italic;">⚙️ ${escapeHtml(msg)}</span>
     `;
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
