@@ -161,6 +161,13 @@ class LudoGame {
     };
   }
 
+  // Sum of steps across all tokens (yard=-1 treated as 0) — used for forced-end rankings
+  getTokenProgress(color) {
+    const tokens = this.tokens[color];
+    if (!tokens) return 0;
+    return tokens.reduce((sum, t) => sum + Math.max(0, t.steps), 0);
+  }
+
   // ---- Private helpers ----
 
   _nextTurn() {

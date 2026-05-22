@@ -426,6 +426,61 @@
 }
 
 /* ---- Win overlay ---- */
+/* ---- Paused overlay ---- */
+.paused-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(10px);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.4s ease;
+}
+.paused-card {
+  text-align: center;
+  padding: 48px 56px;
+  border-radius: var(--radius-xl);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  max-width: 400px;
+  width: 90%;
+}
+.paused-icon {
+  font-size: 4rem;
+  margin-bottom: 12px;
+  animation: pulse-glow 2s ease infinite;
+}
+.paused-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.paused-sub {
+  font-size: 0.95rem;
+  color: var(--accent-1);
+  margin-bottom: 6px;
+}
+.paused-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 28px;
+}
+
+/* ---- Warning button variant ---- */
+.btn-warning {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border: none;
+  box-shadow: 0 2px 12px rgba(245,158,11,0.4);
+}
+.btn-warning:hover { box-shadow: 0 4px 20px rgba(245,158,11,0.6); transform: scale(1.03); }
+
 .win-overlay {
   position: fixed;
   inset: 0;

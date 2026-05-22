@@ -19,6 +19,7 @@ class GameRoom {
     this.game = null;
     this.timer = null;
     this.timerStart = null;
+    this.startedAt = null;
     this.finishOrder = []; // colors in order of finishing
     this.status = 'waiting'; // 'waiting' | 'playing' | 'finished'
     this.hostSocketId = null;
@@ -84,6 +85,7 @@ class GameRoom {
     const playerColors = slotConfig.map(s => s.color);
     this.game = new LudoGame(playerColors);
     this.status = 'playing';
+    this.startedAt = Date.now();
     this._startTimer();
     await this._save();
     return this.game.getState();
@@ -148,11 +150,71 @@ class GameRoom {
     });
 
     await this._save();
+    if (this.status === 'finished') await this._saveHistory('win');
 
     if (this.status !== 'finished') {
       this._startTimer();
       this._handleBotTurnIfNeeded();
     }
+  }
+
+  // Host pauses the game
+  async pause(socketId) {
+    if (socketId !== this.hostSocketId) return false;
+    if (this.status !== 'playing') return false;
+    this._clearTimer();
+    this.status = 'paused';
+    this.io.to(this.roomCode).emit('game-paused', {
+      pausedBy: this.players[socketId]?.name || 'Host',
+    });
+    await this._save();
+    return true;
+  }
+
+  // Host resumes the game
+  async resume(socketId) {
+    if (socketId !== this.hostSocketId) return false;
+    if (this.status !== 'paused') return false;
+    this.status = 'playing';
+    this.io.to(this.roomCode).emit('game-resumed', {
+      state: this.game.getState(),
+    });
+    // Restart timer and hand off to bot if needed
+    this._startTimer();
+    if (this._isCurrentTurnBot()) {
+      if (this.game.phase === 'rolling') {
+        this._handleBotTurnIfNeeded();
+      } else if (this.game.phase === 'moving') {
+        this._handleBotMoveIfNeeded(this.game.movableTokens.map(t => t.id));
+      }
+    }
+    await this._save();
+    return true;
+  }
+
+  // Host force-ends the game
+  async forceEnd(socketId) {
+    if (socketId !== this.hostSocketId) return false;
+    if (this.status !== 'playing') return false;
+    this._clearTimer();
+    this.status = 'finished';
+    // Build standings from current token progress
+    const rankings = this.slotConfig.map(slot => {
+      const progress = this.game
+        ? this.game.getTokenProgress(slot.color)
+        : 0;
+      return { color: slot.color, name: slot.name || slot.color, isBot: !!slot.isBot, progress };
+    }).sort((a, b) => b.progress - a.progress)
+      .map((r, i) => ({ ...r, place: i + 1 }));
+    this.rankings = rankings;
+    this.io.to(this.roomCode).emit('game-ended', {
+      reason: 'host_ended',
+      rankings,
+      state: this.game ? this.game.getState() : null,
+    });
+    await this._save();
+    await this._saveHistory('host_ended');
+    return true;
   }
 
   // Handle emoji reaction
@@ -264,6 +326,7 @@ class GameRoom {
       });
 
       await this._save();
+      if (this.status === 'finished') await this._saveHistory('win');
 
       if (this.status !== 'finished') {
         this._startTimer();
@@ -277,6 +340,39 @@ class GameRoom {
     return player?.color || null;
   }
 
+  async _saveHistory(reason) {
+    if (!this.roomStore) return;
+    const finishedAt = Date.now();
+    // Build final rankings: finishOrder first, then remaining by progress
+    const finished = this.finishOrder.map((color, i) => {
+      const slot = this.slotConfig.find(s => s.color === color) || {};
+      return { place: i + 1, color, name: slot.name || color, isBot: !!slot.isBot };
+    });
+    const finishedColors = new Set(this.finishOrder);
+    const remaining = this.slotConfig
+      .filter(s => !finishedColors.has(s.color))
+      .map(s => ({
+        color: s.color,
+        name: s.name || s.color,
+        isBot: !!s.isBot,
+        progress: this.game ? this.game.getTokenProgress(s.color) : 0,
+      }))
+      .sort((a, b) => b.progress - a.progress)
+      .map((r, i) => ({ place: finished.length + i + 1, color: r.color, name: r.name, isBot: r.isBot }));
+
+    const rankings = reason === 'host_ended' ? this.rankings : [...finished, ...remaining];
+
+    await this.roomStore.saveHistory(this.roomCode, {
+      roomCode: this.roomCode,
+      theme: this.theme,
+      reason,
+      startedAt: this.startedAt,
+      finishedAt,
+      durationSecs: this.startedAt ? Math.round((finishedAt - this.startedAt) / 1000) : null,
+      rankings,
+    });
+  }
+
   toJSON() {
     return {
       roomCode: this.roomCode,
@@ -286,6 +382,7 @@ class GameRoom {
       theme: this.theme,
       game: this.game ? this.game.toJSON() : null,
       timerStart: this.timerStart,
+      startedAt: this.startedAt,
       finishOrder: this.finishOrder,
       status: this.status,
       hostSocketId: this.hostSocketId,
@@ -306,6 +403,7 @@ class GameRoom {
     room.hostSocketId = data.hostSocketId;
     room.rankings = data.rankings || [];
     room.timerStart = data.timerStart || null;
+    room.startedAt = data.startedAt || null;
 
     // Resume timer if playing
     if (room.status === 'playing' && room.timerStart) {

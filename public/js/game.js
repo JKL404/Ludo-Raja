@@ -11,6 +11,7 @@ const GameController = (() => {
   let playerNames = {}; // color → name, persisted from lobby
   let currentState = null;
   let isMyTurn = false;
+  let isHost = false;
 
   const TOKEN_COLORS = {
     red: '#ef4444', blue: '#3b82f6', green: '#22c55e', yellow: '#eab308',
@@ -102,7 +103,7 @@ const GameController = (() => {
       setTimeout(() => { window.location.href = '/'; }, 2500);
     });
 
-    SocketClient.on('game-started', ({ slotConfig: sc, theme: t, state }) => {
+    SocketClient.on('game-started', ({ slotConfig: sc, hostColor, theme: t, state }) => {
       slotConfig = sc;
       theme = t;
       currentState = state;
@@ -110,9 +111,50 @@ const GameController = (() => {
       sc.forEach(s => { if (!s.isBot && s.name) playerNames[s.color] = s.name; });
       sessionStorage.setItem('ludoPlayerNames', JSON.stringify(playerNames));
       sessionStorage.setItem('ludoSlots', JSON.stringify(sc));
+      // Show host-only buttons
+      if (hostColor) {
+        isHost = hostColor === myColor;
+        const endBtn    = document.getElementById('btn-end-game');
+        const pauseBtn  = document.getElementById('btn-pause-game');
+        const resumeBtn = document.getElementById('btn-resume-game');
+        if (endBtn)   endBtn.style.display   = isHost ? 'inline-flex' : 'none';
+        if (pauseBtn) pauseBtn.style.display  = isHost ? 'inline-flex' : 'none';
+        if (resumeBtn) resumeBtn.style.display = 'none'; // shown only when paused
+      }
+      // If rejoining a paused game, show the paused overlay immediately
+      if (isPaused) _showPausedOverlay('Game is paused', isHost);
       // Refresh card names in-place (handles reconnects)
       _refreshCardNames();
       _applyState(state);
+    });
+
+    SocketClient.on('game-paused', ({ pausedBy }) => {
+      TimerUI.stop();
+      _showPausedOverlay(`Paused by ${pausedBy}`, isHost);
+      // Swap pause↔resume buttons for host
+      const pauseBtn  = document.getElementById('btn-pause-game');
+      const resumeBtn = document.getElementById('btn-resume-game');
+      if (pauseBtn)  pauseBtn.style.display  = 'none';
+      if (resumeBtn) resumeBtn.style.display = isHost ? 'inline-flex' : 'none';
+    });
+
+    SocketClient.on('game-resumed', ({ state }) => {
+      _hidePausedOverlay();
+      currentState = state;
+      _applyState(state);
+      // Swap resume↔pause buttons for host
+      const pauseBtn  = document.getElementById('btn-pause-game');
+      const resumeBtn = document.getElementById('btn-resume-game');
+      if (pauseBtn)  pauseBtn.style.display  = isHost ? 'inline-flex' : 'none';
+      if (resumeBtn) resumeBtn.style.display = 'none';
+    });
+
+    SocketClient.on('game-ended', ({ reason, rankings }) => {
+      TimerUI.stop();
+      const msg = reason === 'host_ended' ? 'Host ended the game' : 'Game over';
+      showToast(msg, 'info');
+      // Show a brief rankings overlay then redirect
+      _showEndedScreen(rankings);
     });
 
     SocketClient.on('dice-rolled', ({ color, value, movable, tripleSix, noMoves, state }) => {
@@ -315,6 +357,45 @@ const GameController = (() => {
     return div;
   }
 
+  // ---- Pause overlay ----
+  function _showPausedOverlay(message, hostCanResume) {
+    const overlay   = document.getElementById('paused-overlay');
+    const subLabel  = document.getElementById('paused-by-label');
+    const hint      = document.getElementById('paused-hint');
+    const resumeBtn = document.getElementById('paused-resume-btn');
+    if (!overlay) return;
+    if (subLabel)  subLabel.textContent  = message;
+    if (hint)      hint.textContent      = hostCanResume ? 'Click Resume to continue.' : 'Waiting for host to resume…';
+    if (resumeBtn) resumeBtn.style.display = hostCanResume ? 'inline-flex' : 'none';
+    overlay.style.display = 'flex';
+  }
+
+  function _hidePausedOverlay() {
+    const overlay = document.getElementById('paused-overlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
+  // ---- Force-ended screen ----
+  function _showEndedScreen(rankings) {
+    const overlay = document.getElementById('win-overlay');
+    const nameEl  = document.getElementById('win-name');
+    const rankEl  = document.getElementById('win-rankings');
+    const crownEl = overlay?.querySelector('.win-crown');
+    const titleEl = overlay?.querySelector('.win-title');
+    if (!overlay) { setTimeout(() => { window.location.href = '/'; }, 2000); return; }
+    if (crownEl) crownEl.textContent = '🏁';
+    if (titleEl) titleEl.textContent = 'Game Ended';
+    if (nameEl)  { nameEl.textContent = 'Host ended the game'; nameEl.style.color = 'var(--text-muted)'; }
+    if (rankEl && rankings?.length) {
+      const medals = ['🥇','🥈','🥉','4️⃣'];
+      rankEl.innerHTML = rankings.map((r, i) =>
+        `<div>${medals[i] || (i+1)} ${escapeHtml(r.name || r.color)}</div>`
+      ).join('');
+    }
+    overlay.style.display = 'flex';
+    setTimeout(() => { window.location.href = '/'; }, 8000);
+  }
+
   // ---- Win screen ----
   function _showWin(winnerColor, state) {
     TimerUI.stop();
@@ -427,7 +508,23 @@ const GameController = (() => {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  return { init, rollDice, moveToken, sendReaction, sendChat };
+  function pauseGame() {
+    if (!isHost) return;
+    SocketClient.emit('pause-game', {});
+  }
+
+  function resumeGame() {
+    if (!isHost) return;
+    SocketClient.emit('resume-game', {});
+  }
+
+  function forceEndGame() {
+    if (!isHost) return;
+    if (!confirm('End the game for everyone?')) return;
+    SocketClient.emit('force-end-game', {});
+  }
+
+  return { init, rollDice, moveToken, sendReaction, sendChat, pauseGame, resumeGame, forceEndGame };
 })();
 
 // ---- Boot ----

@@ -84,6 +84,39 @@ class RoomStore {
     }
     return !!this.inMemoryRooms[roomCode];
   }
+
+  async saveHistory(roomCode, data) {
+    if (!roomCode) return;
+    roomCode = roomCode.toUpperCase();
+    if (this.redisClient) {
+      try {
+        await this.redisClient.set(`history:${roomCode}`, JSON.stringify(data), {
+          EX: 86400 // 1 day
+        });
+      } catch (err) {
+        console.error(`[RoomStore] Error saving history ${roomCode}:`, err.message);
+      }
+    }
+    // In-memory fallback (no TTL enforcement, but capped at 50 entries)
+    this._historyCache = this._historyCache || {};
+    this._historyCache[roomCode] = data;
+    const keys = Object.keys(this._historyCache);
+    if (keys.length > 50) delete this._historyCache[keys[0]];
+  }
+
+  async getHistory(roomCode) {
+    if (!roomCode) return null;
+    roomCode = roomCode.toUpperCase();
+    if (this.redisClient) {
+      try {
+        const data = await this.redisClient.get(`history:${roomCode}`);
+        if (data) return JSON.parse(data);
+      } catch (err) {
+        console.error(`[RoomStore] Error reading history ${roomCode}:`, err.message);
+      }
+    }
+    return this._historyCache?.[roomCode] || null;
+  }
 }
 
 module.exports = RoomStore;

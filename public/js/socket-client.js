@@ -29,6 +29,7 @@ const SocketClient = (() => {
       'joined', 'room-updated', 'game-started',
       'dice-rolled', 'token-moved', 'turn-skipped',
       'timer-start', 'reaction', 'chat',
+      'game-paused', 'game-resumed', 'game-ended',
     ];
     events.forEach(evt => {
       socket.on(evt, (data) => {

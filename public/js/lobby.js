@@ -152,26 +152,74 @@ function selectJoinColor(c) {
 
 async function _updateJoinColors(code) {
   const grid = document.getElementById('join-color-grid');
+  const histCard = document.getElementById('room-history-card');
   if (!grid) return;
+
   if (code.length !== 6) {
     grid.querySelectorAll('.color-option').forEach(el => el.classList.remove('taken'));
+    if (histCard) histCard.style.display = 'none';
     return;
   }
-  try {
-    const res = await fetch(`/api/rooms/${code.toUpperCase()}`);
-    if (!res.ok) return;
-    const info = await res.json();
+
+  const upper = code.toUpperCase();
+
+  // Fetch room info and history in parallel
+  const [roomRes, histRes] = await Promise.all([
+    fetch(`/api/rooms/${upper}`).catch(() => null),
+    fetch(`/api/history/${upper}`).catch(() => null),
+  ]);
+
+  // Update taken colors
+  if (roomRes?.ok) {
+    const info = await roomRes.json();
     const takenColors = (info.players || []).map(p => p.color);
     grid.querySelectorAll('.color-option').forEach(el => {
-      const isTaken = takenColors.includes(el.dataset.color);
-      el.classList.toggle('taken', isTaken);
+      el.classList.toggle('taken', takenColors.includes(el.dataset.color));
     });
-    // If currently selected color is now taken, auto-switch to a free one
     if (takenColors.includes(selectedJoinColor)) {
       const free = ALL_COLORS.find(c => !takenColors.includes(c));
       if (free) selectJoinColor(free);
     }
-  } catch (_) { /* ignore network errors */ }
+  }
+
+  // Show last game history card if available
+  if (histCard) {
+    if (histRes?.ok) {
+      const h = await histRes.json();
+      histCard.style.display = 'block';
+      histCard.innerHTML = _renderHistoryCard(h);
+    } else {
+      histCard.style.display = 'none';
+    }
+  }
+}
+
+function _renderHistoryCard(h) {
+  const MEDALS = ['🥇', '🥈', '🥉', '4️⃣'];
+  const REASON_LABEL = { win: 'Completed', host_ended: 'Ended by host' };
+  const duration = h.durationSecs
+    ? `${Math.floor(h.durationSecs / 60)}m ${h.durationSecs % 60}s`
+    : '';
+  const date = h.finishedAt
+    ? new Date(h.finishedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '';
+
+  const rows = (h.rankings || []).map((r, i) => `
+    <div class="hist-row">
+      <span class="hist-medal">${MEDALS[i] || (i + 1)}</span>
+      <span class="hist-dot" style="background:var(--clr-${r.color})"></span>
+      <span class="hist-name">${escapeHtml(r.name || r.color)}</span>
+      ${r.isBot ? '<span class="hist-bot">BOT</span>' : ''}
+    </div>`).join('');
+
+  return `
+    <div class="history-card">
+      <div class="hist-header">
+        <span class="hist-title">Last Game</span>
+        <span class="hist-meta">${REASON_LABEL[h.reason] || ''} · ${duration} · ${date}</span>
+      </div>
+      <div class="hist-rankings">${rows}</div>
+    </div>`;
 }
 
 // ---- Create Game ----

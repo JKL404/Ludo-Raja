@@ -103,6 +103,13 @@ app.get('/api/rooms/:code', async (req, res) => {
   res.json(room.getRoomInfo());
 });
 
+// Get game history for a finished room (1-day TTL)
+app.get('/api/history/:code', async (req, res) => {
+  const history = await roomStore.getHistory(req.params.code);
+  if (!history) return res.status(404).json({ error: 'No history found for this room' });
+  res.json(history);
+});
+
 // ---- Socket.IO events ----
 io.on('connection', (socket) => {
   console.log(`[+] Socket connected: ${socket.id}`);
@@ -116,10 +123,12 @@ io.on('connection', (socket) => {
       return;
     }
     if (room.status !== 'waiting') {
-      // Re-join active game check: allow if player is reclaiming their assigned color slot
-      const isRejoining = room.status === 'playing' &&
-                          room.slotConfig.some(s => s.color === color) &&
-                          (room.colorMap[color] === null || !io.sockets.sockets.has(room.colorMap[color]));
+      // Allow re-joining any non-bot slot in a live or paused game.
+      // We intentionally don't check whether the old socket is still connected —
+      // there is a race window where the lobby socket hasn't disconnected yet
+      // right after game start, which would otherwise block the first load of game.html.
+      const isRejoining = (room.status === 'playing' || room.status === 'paused') &&
+                          room.slotConfig.some(s => s.color === color && !s.isBot);
       if (!isRejoining) {
         socket.emit('error', { message: 'Game already started' });
         return;
@@ -138,15 +147,18 @@ io.on('connection', (socket) => {
     socket.playerColor = color;
     await room.joinPlayer(socket.id, name, color);
 
-    if (room.status === 'playing') {
+    if (room.status === 'playing' || room.status === 'paused') {
+      const isPaused = room.status === 'paused';
       // Send the current game state immediately to the rejoining player
       socket.emit('game-started', {
         slotConfig: room.slotConfig,
+        hostColor: room.players[room.hostSocketId]?.color || null,
         theme: room.theme,
         state: room.game.getState(),
+        isPaused,
       });
-      // Also send the remaining time for the turn
-      if (room.timerStart) {
+      // Send remaining timer only if game is actively running
+      if (!isPaused && room.timerStart) {
         const elapsed = Date.now() - room.timerStart;
         const remaining = Math.max(0, 30000 - elapsed);
         socket.emit('timer-start', { duration: remaining, color: room.game.currentColor });
@@ -172,14 +184,35 @@ io.on('connection', (socket) => {
     }
 
     const state = await room.startGame(slotConfig, theme);
+    const hostColor = room.players[room.hostSocketId]?.color || null;
     io.to(roomCode).emit('game-started', {
       slotConfig: room.slotConfig, // enriched with real player names
+      hostColor,
       theme,
       state,
     });
 
     // If first turn is a bot, handle it
     room._handleBotTurnIfNeeded();
+  });
+
+  // Host pauses / resumes the game
+  socket.on('pause-game', async () => {
+    const room = await getRoom(socket.roomCode);
+    if (room) await room.pause(socket.id);
+  });
+
+  socket.on('resume-game', async () => {
+    const room = await getRoom(socket.roomCode);
+    if (room) await room.resume(socket.id);
+  });
+
+  // Host force-ends the game
+  socket.on('force-end-game', async () => {
+    const roomCode = socket.roomCode;
+    const room = await getRoom(roomCode);
+    if (!room) return;
+    await room.forceEnd(socket.id);
   });
 
   // Roll dice
