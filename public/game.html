@@ -6,6 +6,14 @@
   <title>Ludo — Playing</title>
   <link rel="stylesheet" href="css/main.css"/>
   <link rel="stylesheet" href="css/game.css"/>
+  <script>
+    // Stub to prevent ReferenceError if buttons/inputs are clicked before game.js loads
+    window.GameController = {
+      rollDice: () => {},
+      sendReaction: () => {},
+      sendChat: () => {}
+    };
+  </script>
 </head>
 <body>
   <div class="stars-bg" id="stars-bg"></div>
@@ -60,7 +68,7 @@
             </div>
           </div>
           <div id="dice-value-display" style="font-family:'Orbitron',monospace;font-size:1.6rem;font-weight:700;min-height:2rem;text-align:center"></div>
-          <button class="roll-btn" id="roll-btn" onclick="GameController.rollDice()">🎲 ROLL</button>
+          <button class="roll-btn" id="roll-btn" onclick="GameController.rollDice()" disabled>🎲 ROLL</button>
         </div>
       </div>
 

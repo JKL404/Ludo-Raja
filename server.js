@@ -68,8 +68,14 @@ io.on('connection', (socket) => {
       return;
     }
     if (room.status !== 'waiting') {
-      socket.emit('error', { message: 'Game already started' });
-      return;
+      // Re-join active game check: allow if player is reclaiming their assigned color slot
+      const isRejoining = room.status === 'playing' &&
+                          room.slotConfig.some(s => s.color === color) &&
+                          (room.colorMap[color] === null || !room.players[room.colorMap[color]]);
+      if (!isRejoining) {
+        socket.emit('error', { message: 'Game already started' });
+        return;
+      }
     }
 
     socket.join(roomCode);
@@ -77,7 +83,22 @@ io.on('connection', (socket) => {
     socket.playerColor = color;
     room.joinPlayer(socket.id, name, color);
 
-    io.to(roomCode).emit('room-updated', room.getRoomInfo());
+    if (room.status === 'playing') {
+      // Send the current game state immediately to the rejoining player
+      socket.emit('game-started', {
+        slotConfig: room.slotConfig,
+        theme: room.theme,
+        state: room.game.getState(),
+      });
+      // Also send the remaining time for the turn
+      if (room.timerStart) {
+        const elapsed = Date.now() - room.timerStart;
+        const remaining = Math.max(0, 30000 - elapsed);
+        socket.emit('timer-start', { duration: remaining, color: room.game.currentColor });
+      }
+    } else {
+      io.to(roomCode).emit('room-updated', room.getRoomInfo());
+    }
     socket.emit('joined', { color, roomCode });
     console.log(`[+] ${name} (${color}) joined room ${roomCode}`);
   });
