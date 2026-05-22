@@ -70,9 +70,9 @@ const GameController = (() => {
   function _resizeCanvas(canvas) {
     let size;
     if (window.innerWidth > 900) {
-      size = Math.min(window.innerWidth - 440, window.innerHeight - 180, 600);
+      size = Math.min(window.innerWidth - 440, window.innerHeight - 180, 750);
     } else {
-      size = Math.min(window.innerWidth - 32, window.innerHeight - 340, 500);
+      size = Math.min(window.innerWidth - 24, window.innerHeight - 320, 650);
     }
     const finalSize = Math.max(size, 260);
     canvas.width  = finalSize;
@@ -323,6 +323,9 @@ const GameController = (() => {
       <span class="chat-msg-text">${escapeHtml(msg)}</span>
     `;
     log.appendChild(div);
+    while (log.children.length > 60) {
+      log.removeChild(log.firstChild);
+    }
     log.scrollTop = log.scrollHeight;
   }
 
@@ -335,6 +338,9 @@ const GameController = (() => {
       <span class="chat-msg-text" style="color:var(--text-muted); font-style:italic;">⚙️ ${escapeHtml(msg)}</span>
     `;
     log.appendChild(div);
+    while (log.children.length > 60) {
+      log.removeChild(log.firstChild);
+    }
     log.scrollTop = log.scrollHeight;
   }
 
