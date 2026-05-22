@@ -8,9 +8,10 @@ const { COLORS } = require('./constants');
 const TURN_TIMER_MS = 30000; // 30 seconds
 
 class GameRoom {
-  constructor(roomCode, io) {
+  constructor(roomCode, io, roomStore = null) {
     this.roomCode = roomCode;
     this.io = io;
+    this.roomStore = roomStore;
     this.players = {}; // socketId → { name, color, isBot }
     this.colorMap = {}; // color → socketId (null if bot)
     this.slotConfig = []; // [{color, isBot, name}] — set at room creation
@@ -24,14 +25,31 @@ class GameRoom {
     this.rankings = []; // final rankings
   }
 
-  // Add a human player to a slot
-  joinPlayer(socketId, name, color) {
-    this.players[socketId] = { name, color, isBot: false };
-    this.colorMap[color] = socketId;
-    if (!this.hostSocketId) this.hostSocketId = socketId;
+  async _save() {
+    if (this.roomStore) {
+      try {
+        await this.roomStore.saveRoom(this);
+      } catch (err) {
+        console.error(`[GameRoom] Error saving room state to store:`, err.message);
+      }
+    }
   }
 
-  removePlayer(socketId) {
+  // Add a human player to a slot
+  async joinPlayer(socketId, name, color) {
+    const oldSocketId = this.colorMap[color];
+    if (oldSocketId && this.players[oldSocketId]) {
+      delete this.players[oldSocketId];
+    }
+    this.players[socketId] = { name, color, isBot: false };
+    this.colorMap[color] = socketId;
+    if (!this.hostSocketId || this.hostSocketId === oldSocketId) {
+      this.hostSocketId = socketId;
+    }
+    await this._save();
+  }
+
+  async removePlayer(socketId) {
     const player = this.players[socketId];
     if (!player) return;
     const { color } = player;
@@ -49,21 +67,23 @@ class GameRoom {
         }
       }
     }
+    await this._save();
   }
 
   // Start the game with given slot configuration
-  startGame(slotConfig, theme) {
+  async startGame(slotConfig, theme) {
     this.slotConfig = slotConfig;
     this.theme = theme || 'galaxy';
     const playerColors = slotConfig.map(s => s.color);
     this.game = new LudoGame(playerColors);
     this.status = 'playing';
     this._startTimer();
+    await this._save();
     return this.game.getState();
   }
 
   // Handle a dice roll request
-  handleRoll(socketId) {
+  async handleRoll(socketId) {
     if (!this.game || this.status !== 'playing') return;
     const color = this._getColorForSocket(socketId);
     if (!color || color !== this.game.currentColor) return;
@@ -81,6 +101,8 @@ class GameRoom {
       state: this.game.getState(),
     });
 
+    await this._save();
+
     if (result.tripleSix || result.noMoves) {
       this._startTimer();
       this._handleBotTurnIfNeeded();
@@ -94,7 +116,7 @@ class GameRoom {
   }
 
   // Handle a token move request
-  handleMove(socketId, tokenId) {
+  async handleMove(socketId, tokenId) {
     if (!this.game || this.status !== 'playing') return;
     const color = this._getColorForSocket(socketId);
     if (!color || color !== this.game.currentColor) return;
@@ -117,6 +139,8 @@ class GameRoom {
       win: result.win || null,
       state: this.game.getState(),
     });
+
+    await this._save();
 
     if (this.status !== 'finished') {
       this._startTimer();
@@ -143,21 +167,23 @@ class GameRoom {
   }
 
   // ---- Timer management ----
-  _startTimer() {
+  _startTimer(durationMs = TURN_TIMER_MS) {
     this._clearTimer();
-    this.timerStart = Date.now();
-    this.io.to(this.roomCode).emit('timer-start', { duration: TURN_TIMER_MS, color: this.game?.currentColor });
-    this.timer = setTimeout(() => {
+    this.timerStart = Date.now() - (TURN_TIMER_MS - durationMs);
+    this.io.to(this.roomCode).emit('timer-start', { duration: durationMs, color: this.game?.currentColor });
+    this._save(); // Asynchronously save timer start state
+    this.timer = setTimeout(async () => {
       if (this.game && this.status === 'playing') {
         this.game.skipTurn();
         this.io.to(this.roomCode).emit('turn-skipped', {
           reason: 'timeout',
           state: this.game.getState(),
         });
+        await this._save();
         this._startTimer();
         this._handleBotTurnIfNeeded();
       }
-    }, TURN_TIMER_MS);
+    }, durationMs);
   }
 
   _clearTimer() {
@@ -176,7 +202,7 @@ class GameRoom {
 
   _handleBotTurnIfNeeded() {
     if (!this._isCurrentTurnBot()) return;
-    setTimeout(() => {
+    setTimeout(async () => {
       if (!this.game || this.status !== 'playing') return;
       if (!this._isCurrentTurnBot()) return;
       
@@ -194,6 +220,8 @@ class GameRoom {
         state: this.game.getState(),
       });
 
+      await this._save();
+
       if (result.movable.length > 0) {
         this._handleBotMoveIfNeeded(result.movable);
       } else {
@@ -205,7 +233,7 @@ class GameRoom {
 
   _handleBotMoveIfNeeded(movableIds) {
     if (!this._isCurrentTurnBot()) return;
-    setTimeout(() => {
+    setTimeout(async () => {
       if (!this.game || this.status !== 'playing') return;
       const tokenId = BotPlayer.chooseMove(this.game, movableIds);
       const currentColor = this.game.currentColor;
@@ -228,6 +256,8 @@ class GameRoom {
         state: this.game.getState(),
       });
 
+      await this._save();
+
       if (this.status !== 'finished') {
         this._startTimer();
         this._handleBotTurnIfNeeded();
@@ -238,6 +268,49 @@ class GameRoom {
   _getColorForSocket(socketId) {
     const player = this.players[socketId];
     return player?.color || null;
+  }
+
+  toJSON() {
+    return {
+      roomCode: this.roomCode,
+      players: this.players,
+      colorMap: this.colorMap,
+      slotConfig: this.slotConfig,
+      theme: this.theme,
+      game: this.game ? this.game.toJSON() : null,
+      timerStart: this.timerStart,
+      finishOrder: this.finishOrder,
+      status: this.status,
+      hostSocketId: this.hostSocketId,
+      rankings: this.rankings,
+    };
+  }
+
+  static fromJSON(data, io, roomStore) {
+    if (!data) return null;
+    const room = new GameRoom(data.roomCode, io, roomStore);
+    room.players = data.players || {};
+    room.colorMap = data.colorMap || {};
+    room.slotConfig = data.slotConfig || [];
+    room.theme = data.theme || 'galaxy';
+    room.game = data.game ? LudoGame.fromJSON(data.game) : null;
+    room.finishOrder = data.finishOrder || [];
+    room.status = data.status || 'waiting';
+    room.hostSocketId = data.hostSocketId;
+    room.rankings = data.rankings || [];
+    room.timerStart = data.timerStart || null;
+
+    // Resume timer if playing
+    if (room.status === 'playing' && room.timerStart) {
+      const elapsed = Date.now() - room.timerStart;
+      const remaining = TURN_TIMER_MS - elapsed;
+      if (remaining > 0) {
+        room._startTimer(remaining);
+      } else {
+        room._startTimer(0);
+      }
+    }
+    return room;
   }
 }
 

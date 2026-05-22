@@ -6,6 +6,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const GameRoom = require('./game/GameRoom');
+const RoomStore = require('./game/RoomStore');
 
 const app = express();
 const server = http.createServer(app);
@@ -27,9 +28,51 @@ const io = new Server(server, {
   allowEIO3: true,
 });
 
+// Configure Redis adapter if REDIS_URL is provided
+if (process.env.REDIS_URL) {
+  try {
+    const { createAdapter } = require('@socket.io/redis-adapter');
+    const { createClient } = require('redis');
+    const pubClient = createClient({ url: process.env.REDIS_URL });
+    const subClient = pubClient.duplicate();
+
+    Promise.all([pubClient.connect(), subClient.connect()])
+      .then(() => {
+        io.adapter(createAdapter(pubClient, subClient));
+        console.log('[Socket.IO] Connected to Redis Pub/Sub adapter.');
+      })
+      .catch((err) => {
+        console.error('[Socket.IO] Redis adapter connection failed:', err.message);
+      });
+  } catch (err) {
+    console.error('[Socket.IO] Failed to load/configure Redis adapter:', err.message);
+  }
+}
+
+// Initialize RoomStore
+const roomStore = new RoomStore();
+roomStore.init().catch(err => {
+  console.error('[RoomStore] Initialization failed:', err.message);
+});
+
 // Use PORT from environment (Render injects this) or 3000 for local dev
 const PORT = process.env.PORT || 3000;
-const rooms = {}; // roomCode → GameRoom
+const rooms = {}; // roomCode → GameRoom local cache
+
+async function getRoom(roomCode) {
+  if (!roomCode) return null;
+  const code = roomCode.toUpperCase();
+  if (rooms[code]) {
+    return rooms[code];
+  }
+  const data = await roomStore.get(code);
+  if (data) {
+    const room = GameRoom.fromJSON(data, io, roomStore);
+    rooms[code] = room;
+    return room;
+  }
+  return null;
+}
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -45,16 +88,17 @@ app.get('/health', (_req, res) => res.status(200).json({ status: 'ok', uptime: p
 // ---- REST endpoints ----
 
 // Create a room
-app.post('/api/rooms', (req, res) => {
+app.post('/api/rooms', async (req, res) => {
   const roomCode = _generateCode();
-  const room = new GameRoom(roomCode, io);
+  const room = new GameRoom(roomCode, io, roomStore);
   rooms[roomCode] = room;
+  await roomStore.saveRoom(room);
   res.json({ roomCode });
 });
 
 // Check room exists
-app.get('/api/rooms/:code', (req, res) => {
-  const room = rooms[req.params.code.toUpperCase()];
+app.get('/api/rooms/:code', async (req, res) => {
+  const room = await getRoom(req.params.code);
   if (!room) return res.status(404).json({ error: 'Room not found' });
   res.json(room.getRoomInfo());
 });
@@ -64,9 +108,9 @@ io.on('connection', (socket) => {
   console.log(`[+] Socket connected: ${socket.id}`);
 
   // Join a room as a player
-  socket.on('join-room', ({ roomCode, name, color }) => {
+  socket.on('join-room', async ({ roomCode, name, color }) => {
     roomCode = roomCode.toUpperCase();
-    const room = rooms[roomCode];
+    const room = await getRoom(roomCode);
     if (!room) {
       socket.emit('error', { message: 'Room not found' });
       return;
@@ -75,7 +119,7 @@ io.on('connection', (socket) => {
       // Re-join active game check: allow if player is reclaiming their assigned color slot
       const isRejoining = room.status === 'playing' &&
                           room.slotConfig.some(s => s.color === color) &&
-                          (room.colorMap[color] === null || !room.players[room.colorMap[color]]);
+                          (room.colorMap[color] === null || !io.sockets.sockets.has(room.colorMap[color]));
       if (!isRejoining) {
         socket.emit('error', { message: 'Game already started' });
         return;
@@ -92,7 +136,7 @@ io.on('connection', (socket) => {
     socket.join(roomCode);
     socket.roomCode = roomCode;
     socket.playerColor = color;
-    room.joinPlayer(socket.id, name, color);
+    await room.joinPlayer(socket.id, name, color);
 
     if (room.status === 'playing') {
       // Send the current game state immediately to the rejoining player
@@ -115,9 +159,9 @@ io.on('connection', (socket) => {
   });
 
   // Start the game
-  socket.on('start-game', ({ roomCode, slotConfig, theme }) => {
+  socket.on('start-game', async ({ roomCode, slotConfig, theme }) => {
     roomCode = roomCode?.toUpperCase() || socket.roomCode;
-    const room = rooms[roomCode];
+    const room = await getRoom(roomCode);
     if (!room || room.hostSocketId !== socket.id) return;
 
     // Register bot slots (colorMap = null)
@@ -127,7 +171,7 @@ io.on('connection', (socket) => {
       }
     }
 
-    const state = room.startGame(slotConfig, theme);
+    const state = await room.startGame(slotConfig, theme);
     io.to(roomCode).emit('game-started', {
       slotConfig,
       theme,
@@ -139,33 +183,33 @@ io.on('connection', (socket) => {
   });
 
   // Roll dice
-  socket.on('roll-dice', () => {
+  socket.on('roll-dice', async () => {
     const roomCode = socket.roomCode;
-    const room = rooms[roomCode];
+    const room = await getRoom(roomCode);
     if (!room) return;
-    room.handleRoll(socket.id);
+    await room.handleRoll(socket.id);
   });
 
   // Move token
-  socket.on('move-token', ({ tokenId }) => {
+  socket.on('move-token', async ({ tokenId }) => {
     const roomCode = socket.roomCode;
-    const room = rooms[roomCode];
+    const room = await getRoom(roomCode);
     if (!room) return;
-    room.handleMove(socket.id, tokenId);
+    await room.handleMove(socket.id, tokenId);
   });
 
   // Emoji reaction
-  socket.on('reaction', ({ emoji }) => {
+  socket.on('reaction', async ({ emoji }) => {
     const roomCode = socket.roomCode;
-    const room = rooms[roomCode];
+    const room = await getRoom(roomCode);
     if (!room) return;
     room.handleReaction(socket.id, emoji);
   });
 
   // Chat message
-  socket.on('chat', ({ message }) => {
+  socket.on('chat', async ({ message }) => {
     const roomCode = socket.roomCode;
-    const room = rooms[roomCode];
+    const room = await getRoom(roomCode);
     if (!room) return;
     const player = room.players[socket.id];
     if (!player) return;
@@ -178,11 +222,11 @@ io.on('connection', (socket) => {
   });
 
   // Disconnect
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     const roomCode = socket.roomCode;
-    const room = rooms[roomCode];
+    const room = await getRoom(roomCode);
     if (!room) return;
-    room.removePlayer(socket.id);
+    await room.removePlayer(socket.id);
     if (room.status === 'waiting') {
       io.to(roomCode).emit('room-updated', room.getRoomInfo());
     }

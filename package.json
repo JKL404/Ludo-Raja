@@ -11,12 +11,19 @@
     "node": ">=18.0.0",
     "npm": ">=8.0.0"
   },
-  "keywords": ["ludo", "multiplayer", "game", "socket.io", "real-time"],
+  "keywords": [
+    "ludo",
+    "multiplayer",
+    "game",
+    "socket.io",
+    "real-time"
+  ],
   "author": "JKL404",
   "license": "ISC",
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "express": "^5.2.1",
+    "redis": "^5.12.1",
     "socket.io": "^4.8.3"
   }
 }
-

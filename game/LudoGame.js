@@ -219,6 +219,36 @@ class LudoGame {
     const pathIdx = (entry + steps) % TOTAL_MAIN_PATH;
     return MAIN_PATH[pathIdx];
   }
+
+  toJSON() {
+    return {
+      playerColors: this.playerColors,
+      tokens: this.tokens,
+      currentTurnIndex: this.currentTurnIndex,
+      dice: this.dice,
+      consecutiveSixes: this.consecutiveSixes,
+      phase: this.phase,
+      winner: this.winner,
+      movableTokens: this.movableTokens,
+      lastCapture: this.lastCapture,
+      lastEvent: this.lastEvent,
+    };
+  }
+
+  static fromJSON(data) {
+    if (!data) return null;
+    const game = new LudoGame(data.playerColors);
+    game.tokens = data.tokens;
+    game.currentTurnIndex = data.currentTurnIndex;
+    game.dice = data.dice;
+    game.consecutiveSixes = data.consecutiveSixes;
+    game.phase = data.phase;
+    game.winner = data.winner;
+    game.movableTokens = data.movableTokens || [];
+    game.lastCapture = data.lastCapture;
+    game.lastEvent = data.lastEvent;
+    return game;
+  }
 }
 
 module.exports = LudoGame;
