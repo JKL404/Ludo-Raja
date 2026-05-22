@@ -103,7 +103,7 @@ const GameController = (() => {
       setTimeout(() => { window.location.href = '/'; }, 2500);
     });
 
-    SocketClient.on('game-started', ({ slotConfig: sc, hostColor, theme: t, state }) => {
+    SocketClient.on('game-started', ({ slotConfig: sc, hostColor, theme: t, state, isPaused }) => {
       slotConfig = sc;
       theme = t;
       currentState = state;
