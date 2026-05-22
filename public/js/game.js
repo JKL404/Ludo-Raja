@@ -266,7 +266,7 @@ const GameController = (() => {
 
   function _makePlayerCard(color) {
     const slot = slotConfig.find(s => s.color === color);
-    const name = slot?.isBot ? `Bot 🤖` : (color === myColor ? myName : color);
+    const name = slot?.isBot ? `Bot 🤖` : (color === myColor ? myName : (slot?.name || color));
     const div  = document.createElement('div');
     div.className = 'player-card';
     div.dataset.color = color;

@@ -72,7 +72,14 @@ class GameRoom {
 
   // Start the game with given slot configuration
   async startGame(slotConfig, theme) {
-    this.slotConfig = slotConfig;
+    // Merge actual player names into slotConfig so clients can display real names
+    const colorToName = {};
+    for (const p of Object.values(this.players)) {
+      colorToName[p.color] = p.name;
+    }
+    this.slotConfig = slotConfig.map(s =>
+      s.isBot ? s : { ...s, name: colorToName[s.color] || s.color }
+    );
     this.theme = theme || 'galaxy';
     const playerColors = slotConfig.map(s => s.color);
     this.game = new LudoGame(playerColors);

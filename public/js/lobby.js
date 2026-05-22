@@ -26,6 +26,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('join-name').value   = saved;
   }
 
+  // Update join color grid when room code is typed
+  document.getElementById('join-code')?.addEventListener('input', (e) => {
+    _updateJoinColors(e.target.value.trim());
+  });
+
   SocketClient.connect();
   _setupSocketHandlers();
 });
@@ -137,10 +142,36 @@ function selectColor(c) {
 }
 
 function selectJoinColor(c) {
+  const el = document.querySelector(`#join-color-grid .color-option[data-color="${c}"]`);
+  if (el && el.classList.contains('taken')) return;
   selectedJoinColor = c;
   document.querySelectorAll('#join-color-grid .color-option').forEach(el => {
     el.classList.toggle('selected', el.dataset.color === c);
   });
+}
+
+async function _updateJoinColors(code) {
+  const grid = document.getElementById('join-color-grid');
+  if (!grid) return;
+  if (code.length !== 6) {
+    grid.querySelectorAll('.color-option').forEach(el => el.classList.remove('taken'));
+    return;
+  }
+  try {
+    const res = await fetch(`/api/rooms/${code.toUpperCase()}`);
+    if (!res.ok) return;
+    const info = await res.json();
+    const takenColors = (info.players || []).map(p => p.color);
+    grid.querySelectorAll('.color-option').forEach(el => {
+      const isTaken = takenColors.includes(el.dataset.color);
+      el.classList.toggle('taken', isTaken);
+    });
+    // If currently selected color is now taken, auto-switch to a free one
+    if (takenColors.includes(selectedJoinColor)) {
+      const free = ALL_COLORS.find(c => !takenColors.includes(c));
+      if (free) selectJoinColor(free);
+    }
+  } catch (_) { /* ignore network errors */ }
 }
 
 // ---- Create Game ----
@@ -216,6 +247,9 @@ function _setupSocketHandlers() {
   SocketClient.on('error', (data) => {
     document.getElementById('waiting-room').style.display = 'none';
     document.querySelector('.lobby-card').style.display = 'block';
+    if (data && data.message) {
+      showToast(data.message, 'error');
+    }
     if (data && data.message === 'Room not found') {
       setTimeout(() => {
         window.location.href = '/';
@@ -228,11 +262,17 @@ function _setupSocketHandlers() {
     const startBtn  = document.getElementById('start-btn');
     const startHint = document.getElementById('start-hint');
     if (startBtn) {
-      const canStart = isHost && info.players.length >= 1;
-      startBtn.disabled = !canStart;
-      if (startHint) startHint.textContent = canStart
-        ? `Ready! ${info.players.length} human${info.players.length > 1 ? 's' : ''} connected.`
-        : `Waiting for players…`;
+      if (!isHost) {
+        startBtn.style.display = 'none';
+        if (startHint) startHint.textContent = `Waiting for host to start…`;
+      } else {
+        startBtn.style.display = 'block';
+        const canStart = info.players.length >= 1;
+        startBtn.disabled = !canStart;
+        if (startHint) startHint.textContent = canStart
+          ? `Ready! ${info.players.length} human${info.players.length > 1 ? 's' : ''} connected.`
+          : `Waiting for players…`;
+      }
     }
   });
 
