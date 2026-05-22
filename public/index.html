@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="galaxy">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ludo — Premium Multiplayer Board Game</title>
+  <meta name="description" content="Play premium Ludo with friends on your local WiFi. Classic and Galaxy themes, AI bots, real-time multiplayer."/>
+  <link rel="stylesheet" href="css/main.css"/>
+  <link rel="stylesheet" href="css/lobby.css"/>
+</head>
+<body>
+  <div class="stars-bg" id="stars-bg"></div>
+  <button class="vol-toggle" id="vol-toggle" title="Toggle Sound">🔊</button>
+
+  <div class="lobby-root">
+    <header class="lobby-header">
+      <div class="lobby-logo">LUDO</div>
+      <div class="lobby-subtitle">Premium Multiplayer · Local WiFi</div>
+    </header>
+
+    <div class="lobby-card glass">
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" id="tab-create" onclick="switchTab('create')">Create Game</button>
+        <button class="tab" id="tab-join" onclick="switchTab('join')">Join Game</button>
+      </div>
+
+      <!-- CREATE GAME -->
+      <div class="form-section active" id="section-create">
+        <!-- Theme Selector -->
+        <div class="form-group">
+          <label class="form-label">Board Theme</label>
+          <div class="theme-selector">
+            <div class="theme-option selected" id="theme-galaxy" onclick="selectTheme('galaxy')">
+              <div class="theme-icon">🌌</div>
+              <div class="theme-name">Galaxy</div>
+              <div class="theme-desc">Neon glow · Dark space</div>
+            </div>
+            <div class="theme-option" id="theme-classic" onclick="selectTheme('classic')">
+              <div class="theme-icon">♟️</div>
+              <div class="theme-name">Classic</div>
+              <div class="theme-desc">Warm wood · Jewel tones</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Your Name -->
+        <div class="form-group">
+          <label class="form-label" for="create-name">Your Name</label>
+          <input class="input" type="text" id="create-name" placeholder="Enter your name…" maxlength="20" autocomplete="off"/>
+        </div>
+
+        <!-- Your Color -->
+        <div class="form-group">
+          <label class="form-label">Your Color</label>
+          <div class="color-grid">
+            <div class="color-option red selected" data-color="red" onclick="selectColor('red')">🔴</div>
+            <div class="color-option blue" data-color="blue" onclick="selectColor('blue')">🔵</div>
+            <div class="color-option green" data-color="green" onclick="selectColor('green')">🟢</div>
+            <div class="color-option yellow" data-color="yellow" onclick="selectColor('yellow')">🟡</div>
+          </div>
+        </div>
+
+        <!-- Player Slots -->
+        <div class="form-group">
+          <label class="form-label">Player Slots</label>
+          <div class="slots-config" id="slots-config"></div>
+          <button class="add-slot-btn" id="add-slot-btn" onclick="addSlot()">+ Add Player Slot</button>
+        </div>
+
+        <button class="btn btn-primary btn-lg" style="width:100%" onclick="createGame()">
+          🎲 Create Room
+        </button>
+      </div>
+
+      <!-- JOIN GAME -->
+      <div class="form-section" id="section-join">
+        <div class="form-group">
+          <label class="form-label" for="join-name">Your Name</label>
+          <input class="input" type="text" id="join-name" placeholder="Enter your name…" maxlength="20" autocomplete="off"/>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="join-code">Room Code</label>
+          <input class="input" type="text" id="join-code" placeholder="Enter 6-letter code…" maxlength="6"
+            style="letter-spacing:6px; font-family:'Orbitron',monospace; font-size:1.2rem; text-transform:uppercase"
+            autocomplete="off"/>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Your Color</label>
+          <div class="color-grid" id="join-color-grid">
+            <div class="color-option red selected" data-color="red" onclick="selectJoinColor('red')">🔴</div>
+            <div class="color-option blue" data-color="blue" onclick="selectJoinColor('blue')">🔵</div>
+            <div class="color-option green" data-color="green" onclick="selectJoinColor('green')">🟢</div>
+            <div class="color-option yellow" data-color="yellow" onclick="selectJoinColor('yellow')">🟡</div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-lg" style="width:100%" onclick="joinGame()">
+          🚪 Join Room
+        </button>
+      </div>
+    </div>
+
+    <!-- Waiting Room (hidden until room created/joined) -->
+    <div id="waiting-room" style="display:none; width:100%; max-width:560px; margin-top:16px;" class="animate-fade-in">
+      <div class="lobby-card glass">
+        <div class="room-code-display">
+          <div class="room-code-label">Room Code — Share with friends on WiFi</div>
+          <div class="room-code-value" id="display-room-code">------</div>
+          <div class="room-code-copy" onclick="copyRoomCode()">📋 Tap to copy</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Players in Room</label>
+          <div class="players-list" id="players-list"></div>
+        </div>
+
+        <button class="btn btn-primary btn-lg" style="width:100%" id="start-btn" onclick="startGame()" disabled>
+          ⚔️ Start Game
+        </button>
+        <div style="text-align:center; margin-top:10px; font-size:0.8rem; color:var(--text-muted)" id="start-hint">
+          Waiting for players…
+        </div>
+      </div>
+
+      <div class="wifi-info">
+        🌐 Others on the same WiFi can join at <strong id="wifi-url">http://&lt;your-ip&gt;:3000</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/lobby.js"></script>
+</body>
+</html>

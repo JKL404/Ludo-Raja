@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="galaxy">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ludo — Playing</title>
+  <link rel="stylesheet" href="css/main.css"/>
+  <link rel="stylesheet" href="css/game.css"/>
+</head>
+<body>
+  <div class="stars-bg" id="stars-bg"></div>
+
+  <!-- Top HUD -->
+  <div style="position:relative;z-index:1;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;max-width:1100px;margin:0 auto;width:100%">
+    <div class="turn-banner">
+      <div class="turn-dot" id="turn-dot"></div>
+      <span id="turn-label" style="font-family:'Orbitron',monospace;font-size:0.85rem;">— — —</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="timer-wrap">
+        <div class="timer-ring-container">
+          <svg width="56" height="56" viewBox="0 0 56 56">
+            <circle class="timer-ring-bg" cx="28" cy="28" r="24"/>
+            <circle class="timer-ring-fill" id="timer-ring" cx="28" cy="28" r="24"
+              stroke-dasharray="150.796" stroke-dashoffset="0"/>
+          </svg>
+          <div class="timer-number" id="timer-number">30</div>
+        </div>
+      </div>
+      <button class="vol-toggle" id="vol-toggle" title="Toggle Sound">🔊</button>
+      <button class="btn btn-ghost btn-sm" onclick="window.location='/'">← Lobby</button>
+    </div>
+  </div>
+
+  <!-- Main Game Layout -->
+  <div class="game-root" style="padding-top:0">
+    <div class="game-layout">
+      <!-- Left: Red & Blue players -->
+      <div class="player-panel" id="panel-left"></div>
+
+      <!-- Center: Board + Dice -->
+      <div class="board-container">
+        <canvas id="game-canvas" width="600" height="600"></canvas>
+
+        <div class="dice-area">
+          <!-- 3D Dice -->
+          <div class="dice-3d-wrap">
+            <div class="dice-3d" id="dice-3d">
+              <!-- 6 faces, each face shows pips for value 1-6 -->
+              <div class="dice-face" id="face-front">
+                <span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span>
+                <span class="pip hidden"></span><span class="pip" id="pip-center"></span><span class="pip hidden"></span>
+                <span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span>
+              </div>
+              <div class="dice-face"><span class="pip hidden"></span><span class="pip"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip"></span><span class="pip hidden"></span></div>
+              <div class="dice-face"><span class="pip hidden"></span><span class="pip"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip"></span><span class="pip hidden"></span></div>
+              <div class="dice-face"><span class="pip"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip"></span></div>
+              <div class="dice-face"><span class="pip"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip"></span></div>
+              <div class="dice-face"><span class="pip"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip hidden"></span><span class="pip"></span></div>
+            </div>
+          </div>
+          <div id="dice-value-display" style="font-family:'Orbitron',monospace;font-size:1.6rem;font-weight:700;min-height:2rem;text-align:center"></div>
+          <button class="roll-btn" id="roll-btn" onclick="GameController.rollDice()">🎲 ROLL</button>
+        </div>
+      </div>
+
+      <!-- Right: Green & Yellow players + Chat -->
+      <div class="player-panel" id="panel-right">
+        <!-- Reactions -->
+        <div class="side-panel">
+          <div class="side-panel-title">⚡ Reactions</div>
+          <div class="reactions-grid">
+            <button class="reaction-btn" onclick="GameController.sendReaction('🎉')">🎉</button>
+            <button class="reaction-btn" onclick="GameController.sendReaction('🔥')">🔥</button>
+            <button class="reaction-btn" onclick="GameController.sendReaction('😱')">😱</button>
+            <button class="reaction-btn" onclick="GameController.sendReaction('💀')">💀</button>
+            <button class="reaction-btn" onclick="GameController.sendReaction('👑')">👑</button>
+            <button class="reaction-btn" onclick="GameController.sendReaction('🤡')">🤡</button>
+          </div>
+        </div>
+
+        <!-- Chat -->
+        <div class="side-panel" style="flex:1">
+          <div class="side-panel-title">💬 Chat</div>
+          <div class="chat-log" id="chat-log"></div>
+          <div class="chat-input-wrap">
+            <input class="chat-input" id="chat-input" placeholder="Message…" maxlength="80"
+              onkeydown="if(event.key==='Enter')GameController.sendChat()"/>
+            <button class="chat-send" onclick="GameController.sendChat()">→</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Win Overlay (hidden) -->
+  <div class="win-overlay" id="win-overlay" style="display:none">
+    <div class="win-card glass">
+      <div class="win-crown">👑</div>
+      <div class="win-title">Winner!</div>
+      <div class="win-name" id="win-name">—</div>
+      <div id="win-rankings" style="margin-bottom:28px;color:var(--text-muted);font-size:0.9rem"></div>
+      <button class="btn btn-primary btn-lg" onclick="window.location='/'">🏠 Back to Lobby</button>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <!-- Particles canvas -->
+  <canvas id="particles-canvas" style="position:fixed;inset:0;pointer-events:none;z-index:800"></canvas>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/particles.js"></script>
+  <script src="js/timer.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/dice.js"></script>
+  <script src="js/socket-client.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

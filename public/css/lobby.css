@@ -1,0 +1,415 @@
+/* ============================================================
+   lobby.css — Premium lobby page styles
+   ============================================================ */
+
+.lobby-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Floating star particles (galaxy theme) */
+.stars-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.star {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: white;
+  animation: starFloat linear infinite;
+  opacity: 0;
+}
+[data-theme="classic"] .stars-bg { display: none; }
+
+/* ---- Hero Header ---- */
+.lobby-header {
+  text-align: center;
+  margin-bottom: 48px;
+  animation: fadeIn 0.6s ease;
+}
+.lobby-logo {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(2.8rem, 6vw, 5rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 4px;
+  background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 50%, var(--gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  filter: drop-shadow(0 0 30px var(--accent-glow));
+}
+[data-theme="classic"] .lobby-logo {
+  font-family: 'Rajdhani', sans-serif;
+  background: linear-gradient(135deg, var(--gold) 0%, #f5a623 50%, var(--accent-2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.lobby-subtitle {
+  color: var(--text-muted);
+  font-size: 1rem;
+  margin-top: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* ---- Main card ---- */
+.lobby-card {
+  width: 100%;
+  max-width: 560px;
+  padding: 40px;
+  border-radius: var(--radius-xl);
+  position: relative;
+  z-index: 1;
+  animation: fadeIn 0.7s ease;
+}
+
+/* ---- Tabs ---- */
+.tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(0,0,0,0.3);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  margin-bottom: 32px;
+}
+.tab {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tab.active {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: white;
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+/* ---- Form sections ---- */
+.form-section { display: none; }
+.form-section.active { display: block; }
+
+.form-group {
+  margin-bottom: 20px;
+}
+.form-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ---- Theme Selector ---- */
+.theme-selector {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.theme-option {
+  flex: 1;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border-glass);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: center;
+}
+.theme-option:hover { border-color: var(--accent-1); }
+.theme-option.selected {
+  border-color: var(--accent-1);
+  background: var(--accent-glow);
+}
+.theme-option .theme-icon { font-size: 1.8rem; margin-bottom: 6px; }
+.theme-option .theme-name {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+.theme-option .theme-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ---- Slot configurator (player/bot slots) ---- */
+.slots-config {
+  margin-bottom: 20px;
+}
+.slot-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
+  background: var(--bg-card);
+  margin-bottom: 10px;
+  transition: var(--transition);
+}
+.slot-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 12px currentColor;
+}
+.slot-dot.red    { background: var(--clr-red);    color: var(--clr-red); }
+.slot-dot.blue   { background: var(--clr-blue);   color: var(--clr-blue); }
+.slot-dot.green  { background: var(--clr-green);  color: var(--clr-green); }
+.slot-dot.yellow { background: var(--clr-yellow); color: var(--clr-yellow); }
+
+.slot-color-name {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  flex: 1;
+  text-transform: capitalize;
+}
+.slot-toggle {
+  display: flex;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.slot-toggle button {
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.slot-toggle button.active {
+  background: var(--accent-1);
+  color: white;
+  border-radius: 6px;
+}
+.slot-toggle button.active.bot {
+  background: #6366f1;
+}
+.slot-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: var(--transition);
+}
+.slot-remove:hover { color: var(--clr-red); background: rgba(239,68,68,0.1); }
+
+.add-slot-btn {
+  width: 100%;
+  padding: 12px;
+  border: 2px dashed var(--border-glass);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.add-slot-btn:hover { border-color: var(--accent-1); color: var(--accent-1); }
+
+/* ---- Room code display ---- */
+.room-code-display {
+  text-align: center;
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  margin-bottom: 24px;
+}
+.room-code-label {
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.room-code-value {
+  font-family: 'Orbitron', monospace;
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: 8px;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+[data-theme="classic"] .room-code-value {
+  font-family: 'Rajdhani', sans-serif;
+  background: linear-gradient(135deg, var(--gold), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.room-code-copy {
+  margin-top: 10px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.room-code-copy:hover { color: var(--accent-1); }
+
+/* ---- Players waiting list ---- */
+.players-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.player-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  animation: fadeIn 0.3s ease;
+}
+.player-badge .badge-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+}
+.player-badge .badge-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex: 1;
+}
+.player-badge .badge-you {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  background: var(--accent-glow);
+  border: 1px solid var(--accent-1);
+  border-radius: 20px;
+  color: var(--accent-1);
+}
+.player-badge .badge-bot {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  background: rgba(99,102,241,0.2);
+  border: 1px solid #6366f1;
+  border-radius: 20px;
+  color: #a5b4fc;
+}
+
+/* ---- Color picker ---- */
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.color-option {
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  position: relative;
+  overflow: hidden;
+}
+.color-option:hover { transform: scale(1.05); }
+.color-option.selected { border-color: white; box-shadow: 0 0 20px rgba(255,255,255,0.3); }
+.color-option.taken { opacity: 0.35; cursor: not-allowed; }
+.color-option.red    { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+.color-option.blue   { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+.color-option.green  { background: linear-gradient(135deg, #22c55e, #15803d); }
+.color-option.yellow { background: linear-gradient(135deg, #eab308, #a16207); }
+
+/* ---- WiFi info ---- */
+.wifi-info {
+  text-align: center;
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  background: rgba(0,0,0,0.3);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 16px;
+}
+.wifi-info strong { color: var(--accent-1); }
+
+/* ---- Player count selector ---- */
+.count-selector {
+  display: flex;
+  gap: 8px;
+}
+.count-btn {
+  flex: 1;
+  padding: 10px;
+  border: 2px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: center;
+}
+.count-btn.active {
+  border-color: var(--accent-1);
+  color: var(--accent-1);
+  background: var(--accent-glow);
+}
+
+/* ---- Volume toggle ---- */
+.vol-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.1rem;
+  z-index: 100;
+  transition: var(--transition);
+}
+.vol-toggle:hover { background: var(--bg-card); }
