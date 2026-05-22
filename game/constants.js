@@ -69,12 +69,12 @@ const HOME_COL_ENTRY = {
 const SAFE_POSITIONS = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
 
 // Starting yard positions (pixel-based centers within home areas) for each color's 4 tokens
-// These are [col, row] within the 15×15 grid
+// These are [col, row] within the 15×15 grid (centered symmetrically)
 const YARD_POSITIONS = {
-  red:    [[2,11],[4,11],[2,13],[4,13]],
-  blue:   [[2,2],[4,2],[2,4],[4,4]],
-  green:  [[10,2],[12,2],[10,4],[12,4]],
-  yellow: [[10,10],[12,10],[10,12],[12,12]],
+  red:    [[1.5, 10.5], [3.5, 10.5], [1.5, 12.5], [3.5, 12.5]],
+  blue:   [[1.5, 1.5],  [3.5, 1.5],  [1.5, 3.5],  [3.5, 3.5]],
+  green:  [[10.5, 1.5], [12.5, 1.5], [10.5, 3.5], [12.5, 3.5]],
+  yellow: [[10.5, 10.5],[12.5, 10.5],[10.5, 12.5],[12.5, 12.5]],
 };
 
 // Color of each home zone on the board

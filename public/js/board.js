@@ -38,10 +38,10 @@ const BoardRenderer = (() => {
   };
 
   const YARD_POSITIONS = {
-    red:    [[2,11],[4,11],[2,13],[4,13]],
-    blue:   [[2,2],[4,2],[2,4],[4,4]],
-    green:  [[10,2],[12,2],[10,4],[12,4]],
-    yellow: [[10,10],[12,10],[10,12],[12,12]],
+    red:    [[1.5, 10.5], [3.5, 10.5], [1.5, 12.5], [3.5, 12.5]],
+    blue:   [[1.5, 1.5],  [3.5, 1.5],  [1.5, 3.5],  [3.5, 3.5]],
+    green:  [[10.5, 1.5], [12.5, 1.5], [10.5, 3.5], [12.5, 3.5]],
+    yellow: [[10.5, 10.5],[12.5, 10.5],[10.5, 12.5],[12.5, 12.5]],
   };
 
 
@@ -92,6 +92,57 @@ const BoardRenderer = (() => {
   let movableIds = [];
   let hoveredToken = null;
   let tokenAnimations = {}; // color+id → { x, y, targetX, targetY }
+  let displaySteps = {};
+  let isAnimating = false;
+
+  function _syncDisplaySteps() {
+    displaySteps = {};
+    if (!gameState?.tokens) return;
+    for (const [color, tokens] of Object.entries(gameState.tokens)) {
+      tokens.forEach((token, id) => {
+        displaySteps[`${color}_${id}`] = token.steps;
+      });
+    }
+  }
+
+  function _animateTokenMove(color, id, from, to, captured, reachedHome) {
+    isAnimating = true;
+    let current = from;
+    
+    // Play initial sound if entering board from yard
+    if (from === -1 && to >= 0) {
+      if (window.SoundEngine) window.SoundEngine.play.enterBoard();
+    }
+
+    function nextStep() {
+      if (current >= to) {
+        _syncDisplaySteps();
+        isAnimating = false;
+        
+        if (captured) {
+          if (window.SoundEngine) window.SoundEngine.play.capture();
+        } else if (reachedHome) {
+          if (window.SoundEngine) window.SoundEngine.play.enterHome();
+        }
+        
+        draw();
+        return;
+      }
+      
+      current++;
+      displaySteps[`${color}_${id}`] = current;
+      
+      // Play tick sound per step
+      if (!(from === -1 && current === 0)) {
+        if (window.SoundEngine) window.SoundEngine.play.tokenMove();
+      }
+      
+      draw();
+      setTimeout(nextStep, 180);
+    }
+    
+    nextStep();
+  }
 
   // Helper to convert hex to rgb for opacity adjustments in Galaxy theme
   function _hexToRgb(hex) {
@@ -138,9 +189,49 @@ const BoardRenderer = (() => {
   }
 
   function setTheme(t) { theme = t; draw(); }
-  function setState(state, mIds) {
+  function setState(state, mIds, options = {}) {
+    const oldState = gameState;
     gameState  = state;
     movableIds = mIds || [];
+
+    if (options.animate && oldState && oldState.tokens) {
+      // Find which token moved
+      let movingToken = null;
+      for (const color of Object.keys(state.tokens)) {
+        for (let id = 0; id < state.tokens[color].length; id++) {
+          const oldSteps = oldState.tokens[color][id].steps;
+          const newSteps = state.tokens[color][id].steps;
+          if (newSteps > oldSteps) {
+            movingToken = { color, id, from: oldSteps, to: newSteps };
+            break;
+          }
+        }
+        if (movingToken) break;
+      }
+
+      if (movingToken) {
+        // Sync displaySteps to oldState first
+        displaySteps = {};
+        for (const [color, tokens] of Object.entries(oldState.tokens)) {
+          tokens.forEach((token, id) => {
+            displaySteps[`${color}_${id}`] = token.steps;
+          });
+        }
+
+        // Run animation
+        _animateTokenMove(
+          movingToken.color,
+          movingToken.id,
+          movingToken.from,
+          movingToken.to,
+          options.captured,
+          options.reachedHome
+        );
+        return;
+      }
+    }
+
+    _syncDisplaySteps();
     draw();
   }
   function setMyColor(c) { myColor = c; }
@@ -458,7 +549,8 @@ const BoardRenderer = (() => {
 
     for (const [color, tokens] of Object.entries(gameState.tokens)) {
       tokens.forEach((token, id) => {
-        if (token.steps === -1) {
+        const steps = displaySteps[`${color}_${id}`] !== undefined ? displaySteps[`${color}_${id}`] : token.steps;
+        if (steps === -1) {
           // Yard tokens are placed in pockets, no overlap
           const yard = YARD_POSITIONS[color];
           if (yard && yard[id]) {
@@ -466,12 +558,12 @@ const BoardRenderer = (() => {
             const py = yard[id][1] * c + c/2;
             tokenLayoutMap[`${color}_${id}`] = { x: px, y: py, scale: 1.0 };
           }
-        } else if (token.steps >= 0 && token.steps < TOTAL_STEPS) {
-          const cell = _getTokenCell(color, token.steps);
+        } else if (steps >= 0 && steps < TOTAL_STEPS) {
+          const cell = _getTokenCell(color, steps);
           if (cell) {
             const key = `${cell[0]},${cell[1]}`;
             if (!cellGroups[key]) cellGroups[key] = [];
-            cellGroups[key].push({ color, id, steps: token.steps });
+            cellGroups[key].push({ color, id, steps: steps });
           }
         }
       });
@@ -617,9 +709,9 @@ const BoardRenderer = (() => {
     ctx.textBaseline = 'middle';
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
     ctx.lineWidth = 2.5;
-    ctx.strokeText(id + 1, 0, 0);
+    ctx.strokeText(id + 1, 0, r * 0.08);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(id + 1, 0, 0);
+    ctx.fillText(id + 1, 0, r * 0.08);
 
     // Movable indicator (bouncing dot above)
     if (isMovable) {
@@ -645,6 +737,7 @@ const BoardRenderer = (() => {
 
   // ---- Click/hover handling ----
   function _handleClick(e) {
+    if (isAnimating) return;
     if (!gameState || gameState.phase !== 'moving' || !myColor) return;
     if (!movableIds.length) return;
 
@@ -668,6 +761,7 @@ const BoardRenderer = (() => {
   }
 
   function _handleHover(e) {
+    if (isAnimating) return;
     if (!gameState || gameState.phase !== 'moving' || !myColor) return;
     const rect = canvas.getBoundingClientRect();
     const mx = (e.clientX - rect.left) * (canvas.width / rect.width);

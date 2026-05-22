@@ -342,6 +342,8 @@ const GameController = (() => {
     const s = currentState;
     if (!s || s.currentColor !== myColor || s.phase !== 'rolling') return;
     SoundEngine.resume();
+    const btn = document.getElementById('roll-btn');
+    if (btn) btn.disabled = true;
     SocketClient.emit('roll-dice', {});
   }
 

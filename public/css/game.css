@@ -130,17 +130,7 @@
   width: 80px; height: 80px;
   position: relative;
   transform-style: preserve-3d;
-  transition: transform 0.6s ease;
-}
-.dice-3d.rolling {
-  animation: diceRoll 0.6s ease;
-}
-@keyframes diceRoll {
-  0%   { transform: rotate3d(1,1,0, 0deg); }
-  25%  { transform: rotate3d(1,0,1, 180deg); }
-  50%  { transform: rotate3d(0,1,1, 360deg); }
-  75%  { transform: rotate3d(1,1,0, 540deg); }
-  100% { transform: rotate3d(0,0,1, 720deg); }
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .dice-face {
   position: absolute;
@@ -483,6 +473,11 @@
     flex-wrap: wrap;
   }
   .player-card { flex: 1; min-width: 140px; }
+  .side-panel {
+    flex: 1;
+    min-width: 200px;
+    height: 280px; /* Fixed height so messages don't grow/stretch the box */
+  }
 }
 
 @media (max-width: 600px) {

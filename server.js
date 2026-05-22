@@ -32,7 +32,11 @@ const PORT = process.env.PORT || 3000;
 const rooms = {}; // roomCode → GameRoom
 
 // Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, path) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  }
+}));
 app.use(express.json());
 
 // ---- Health check (required for Render) ----
