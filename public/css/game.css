@@ -38,6 +38,9 @@
   cursor: pointer;
   transition: box-shadow 0.3s ease;
   max-width: 100%;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
 }
 [data-theme="classic"] #game-canvas {
   box-shadow: 0 0 60px rgba(0,0,0,0.6), 0 0 40px var(--gold-glow);
@@ -709,5 +712,33 @@
 [data-theme="classic"] .vol-toggle:hover {
   background: rgba(212, 160, 23, 0.25);
   border-color: rgba(212, 160, 23, 0.6);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), 0 0 12px rgba(212, 160, 23, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(212, 160, 23, 0.3);
+}
+
+/* Roll Player Names styling */
+.roll-player-name {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.roll-player-you {
+  color: #fbbf24; /* Warm Gold */
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+  font-size: 1.05em;
+}
+.roll-player-red {
+  color: #ef4444; /* Classic Red */
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+.roll-player-blue {
+  color: #3b82f6; /* Classic Blue */
+  text-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+.roll-player-green {
+  color: #10b981; /* Classic Green */
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+.roll-player-yellow {
+  color: #eab308; /* Classic Yellow */
+  text-shadow: 0 0 8px rgba(234, 179, 8, 0.4);
 }

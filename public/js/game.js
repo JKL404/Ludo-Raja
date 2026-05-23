@@ -159,8 +159,10 @@ const GameController = (() => {
 
     SocketClient.on('dice-rolled', ({ color, value, movable, tripleSix, noMoves, state }) => {
       currentState = state;
-      const displayName = color === myColor ? 'You' : _nameFor(color);
-      DiceUI.roll(value, displayName, () => {
+      const isMe = color === myColor;
+      const rawName = isMe ? 'You' : _nameFor(color);
+      const styledName = `<span class="roll-player-name roll-player-${isMe ? 'you' : color}">${rawName}</span>`;
+      DiceUI.roll(value, styledName, () => {
         BoardRenderer.setState(state, myColor === state.currentColor ? state.movableTokens : []);
         _updateUI(state, color, value, { tripleSix, noMoves, movable });
       });
@@ -181,7 +183,10 @@ const GameController = (() => {
       BoardRenderer.setState(state, myColor === state.currentColor ? state.movableTokens : [], {
         animate: true,
         captured,
-        reachedHome
+        reachedHome,
+        onComplete: () => {
+          _updateRollBtn(state);
+        }
       });
       _updateTurnUI(state);
       _updatePlayerCards(state);
@@ -303,7 +308,7 @@ const GameController = (() => {
     const s = state || currentState;
     if (!s) return;
     const myTurn = s.currentColor === myColor;
-    const canRoll = myTurn && s.phase === 'rolling' && s.phase !== 'finished';
+    const canRoll = myTurn && s.phase === 'rolling' && s.phase !== 'finished' && !BoardRenderer.isAnimating();
     btn.disabled = !canRoll;
     btn.textContent = canRoll ? '🎲 ROLL' : (s.phase === 'moving' && myTurn ? '← Pick a token' : '⏳ Waiting…');
     isMyTurn = myTurn;
@@ -459,7 +464,7 @@ const GameController = (() => {
   // ---- Public actions ----
   function rollDice() {
     const s = currentState;
-    if (!s || s.currentColor !== myColor || s.phase !== 'rolling') return;
+    if (!s || s.currentColor !== myColor || s.phase !== 'rolling' || BoardRenderer.isAnimating()) return;
     SoundEngine.resume();
     const btn  = document.getElementById('roll-btn');
     const wrap = document.getElementById('dice-3d-wrap');

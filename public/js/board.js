@@ -105,7 +105,7 @@ const BoardRenderer = (() => {
     }
   }
 
-  function _animateTokenMove(color, id, from, to, captured, reachedHome) {
+  function _animateTokenMove(color, id, from, to, captured, reachedHome, onComplete) {
     isAnimating = true;
     let current = from;
     
@@ -126,6 +126,7 @@ const BoardRenderer = (() => {
         }
         
         draw();
+        if (onComplete) onComplete();
         return;
       }
       
@@ -225,7 +226,8 @@ const BoardRenderer = (() => {
           movingToken.from,
           movingToken.to,
           options.captured,
-          options.reachedHome
+          options.reachedHome,
+          options.onComplete
         );
         return;
       }
@@ -233,6 +235,7 @@ const BoardRenderer = (() => {
 
     _syncDisplaySteps();
     draw();
+    if (options.onComplete) options.onComplete();
   }
   function setMyColor(c) { myColor = c; }
 
@@ -802,7 +805,7 @@ const BoardRenderer = (() => {
     if (_animFrame) { cancelAnimationFrame(_animFrame); _animFrame = null; }
   }
 
-  return { init, setTheme, setState, setMyColor, draw, startAnimLoop, stopAnimLoop, MAIN_PATH, HOME_COLUMNS, YARD_POSITIONS, COLOR_ENTRY };
+  return { init, setTheme, setState, setMyColor, draw, startAnimLoop, stopAnimLoop, isAnimating: () => isAnimating, MAIN_PATH, HOME_COLUMNS, YARD_POSITIONS, COLOR_ENTRY };
 })();
 
 window.BoardRenderer = BoardRenderer;
