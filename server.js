@@ -3,6 +3,7 @@
 // ============================================================
 const express = require('express');
 const http = require('http');
+const fs = require('fs');
 const { Server } = require('socket.io');
 const path = require('path');
 const GameRoom = require('./game/GameRoom');
@@ -78,6 +79,37 @@ async function getRoom(roomCode) {
   }
   return null;
 }
+
+// Intercept root requests with join code and dynamic host name to serve index.html with Open Graph meta tags
+app.get(['/', '/index.html'], async (req, res, next) => {
+  const host = req.query.host;
+  const join = req.query.join;
+  
+  if (join) {
+    try {
+      const filePath = path.join(__dirname, 'public', 'index.html');
+      let html = await fs.promises.readFile(filePath, 'utf8');
+      
+      const hostName = host ? decodeURIComponent(host) : 'a friend';
+      const origin = `${req.protocol}://${req.get('host')}`;
+      
+      const ogTitle = `<meta property="og:title" content="Ludo Raja 🇳🇵 — Play with ${hostName}" />`;
+      const ogDesc = `<meta property="og:description" content="Join Room ${join} to play Ludo Raja with ${hostName} in real-time!" />`;
+      const ogImage = `<meta property="og:image" content="${origin}/favicon.png" />`;
+      const ogUrl = `<meta property="og:url" content="${origin}/?join=${join}&host=${encodeURIComponent(hostName)}" />`;
+      const ogType = `<meta property="og:type" content="website" />`;
+      
+      const tags = `\n  ${ogTitle}\n  ${ogDesc}\n  ${ogImage}\n  ${ogUrl}\n  ${ogType}`;
+      html = html.replace('</head>', `${tags}\n</head>`);
+      
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      return res.send(html);
+    } catch (err) {
+      console.error('[OG Tag Injection Error]', err);
+    }
+  }
+  next();
+});
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public'), {

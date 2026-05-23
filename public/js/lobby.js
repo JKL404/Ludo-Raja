@@ -156,10 +156,15 @@ function addSlot() {
 
 // ---- Tab switching ----
 function switchTab(tab) {
-  ['create','join'].forEach(t => {
-    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
-    document.getElementById(`section-${t}`).classList.toggle('active', t === tab);
+  ['create','join','history'].forEach(t => {
+    const tabEl = document.getElementById(`tab-${t}`);
+    const secEl = document.getElementById(`section-${t}`);
+    if (tabEl) tabEl.classList.toggle('active', t === tab);
+    if (secEl) secEl.classList.toggle('active', t === tab);
   });
+  if (tab === 'history') {
+    _renderRecentRooms();
+  }
 }
 
 // ---- Theme selection ----
@@ -283,6 +288,7 @@ async function createGame() {
   const data = await res.json();
   roomCode   = data.roomCode;
   isHost     = true;
+  saveRecentRoom(roomCode);
 
   // Make sure host color is first slot
   slotConfig[0].color = selectedColor;
@@ -311,6 +317,7 @@ function joinGame() {
   sessionStorage.setItem('ludoIsHost', 'false');
   roomCode = code;
   isHost   = false;
+  saveRecentRoom(code);
 
   SocketClient.emit('join-room', { roomCode: code, name, color: selectedJoinColor });
   document.getElementById('display-room-code').textContent = code;
@@ -328,12 +335,36 @@ function startGame() {
   });
 }
 
-// ---- Copy room code ----
+// ---- Copy/Share room code ----
 function copyRoomCode() {
-  if (roomCode) {
-    const shareUrl = `${window.location.origin}/?join=${roomCode}`;
-    navigator.clipboard.writeText(shareUrl).then(() => showToast('Share link copied!', 'success'));
+  if (!roomCode) return;
+  
+  const hostName = sessionStorage.getItem('ludoName') || 'a friend';
+  const shareUrl = `${window.location.origin}/?join=${roomCode}&host=${encodeURIComponent(hostName)}`;
+  
+  const shareData = {
+    title: 'Ludo Raja 🇳🇵',
+    text: `Play Ludo Raja with ${hostName}! Click the link to join Room ${roomCode}:`,
+    url: shareUrl
+  };
+  
+  if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+    navigator.share(shareData)
+      .then(() => showToast('Shared successfully!', 'success'))
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          _copyToClipboardFallback(shareUrl);
+        }
+      });
+  } else {
+    _copyToClipboardFallback(shareUrl);
   }
+}
+
+function _copyToClipboardFallback(text) {
+  navigator.clipboard.writeText(text)
+    .then(() => showToast('Share link copied to clipboard!', 'success'))
+    .catch(() => showToast('Failed to copy link.', 'error'));
 }
 
 // ---- Socket handlers ----
@@ -344,6 +375,16 @@ function _setupSocketHandlers() {
   });
 
   SocketClient.on('error', (data) => {
+    if (data && data.message === 'Game already started') {
+      // Quietly clean up stale session state and return to lobby card
+      sessionStorage.removeItem('ludoRoom');
+      sessionStorage.removeItem('ludoIsHost');
+      sessionStorage.removeItem('ludoColor');
+      document.getElementById('waiting-room').style.display = 'none';
+      document.querySelector('.lobby-card').style.display = 'block';
+      return;
+    }
+
     document.getElementById('waiting-room').style.display = 'none';
     document.querySelector('.lobby-card').style.display = 'block';
     
@@ -433,3 +474,83 @@ function leaveRoom() {
   sessionStorage.removeItem('ludoColor');
   window.location.reload();
 }
+
+function saveRecentRoom(code) {
+  if (!code) return;
+  let rooms = [];
+  try {
+    rooms = JSON.parse(localStorage.getItem('ludoRecentRooms') || '[]');
+  } catch(e) {}
+  if (!Array.isArray(rooms)) rooms = [];
+  rooms = rooms.filter(c => c !== code);
+  rooms.unshift(code);
+  if (rooms.length > 5) rooms = rooms.slice(0, 5);
+  localStorage.setItem('ludoRecentRooms', JSON.stringify(rooms));
+}
+
+async function _renderRecentRooms() {
+  const container = document.getElementById('recent-rooms-list');
+  if (!container) return;
+  
+  let rooms = [];
+  try {
+    rooms = JSON.parse(localStorage.getItem('ludoRecentRooms') || '[]');
+  } catch(e){}
+  
+  if (!rooms || rooms.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:0.95rem;">No recent games found. Create or join a room to get started!</div>';
+    return;
+  }
+  
+  container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">Loading recent games…</div>';
+  
+  try {
+    const fetches = rooms.map(code => 
+      fetch(`/api/history/${code}`)
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
+    );
+    
+    const results = await Promise.all(fetches);
+    
+    container.innerHTML = '';
+    
+    results.forEach((h, idx) => {
+      const code = rooms[idx];
+      const div = document.createElement('div');
+      div.className = 'recent-room-item';
+      div.style.marginBottom = '16px';
+      
+      if (h) {
+        div.innerHTML = `
+          <div class="hist-header-recent" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding: 0 4px;">
+            <span style="font-size:0.75rem;color:var(--text-muted);font-weight:700;">ROOM: ${code}</span>
+            <span style="cursor:pointer;color:var(--gold);font-size:0.75rem;font-weight:600;" onclick="quickJoin('${code}')">🚪 Rejoin / View</span>
+          </div>
+          ${_renderHistoryCard(h)}
+        `;
+      } else {
+        div.innerHTML = `
+          <div class="history-card" style="padding:14px;background:rgba(0,0,0,0.25);">
+            <div class="hist-header" style="margin-bottom:0;">
+              <span class="hist-title">ROOM: ${code}</span>
+              <span class="hist-meta" style="cursor:pointer;color:var(--gold);font-weight:600;" onclick="quickJoin('${code}')">🚪 Join Room</span>
+            </div>
+          </div>
+        `;
+      }
+      container.appendChild(div);
+    });
+  } catch (err) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--clr-red);">Error loading recent games.</div>';
+  }
+}
+
+window.quickJoin = function(code) {
+  const codeInput = document.getElementById('join-code');
+  if (codeInput) {
+    codeInput.value = code;
+    switchTab('join');
+    _updateJoinColors(code);
+  }
+};

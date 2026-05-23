@@ -126,9 +126,16 @@ class GameRoom {
     if (result.movable.length > 0) {
       // If current turn is a bot, schedule bot move
       this._handleBotMoveIfNeeded(result.movable);
-      // Restart timer for human player's move selection phase
+      
+      // If current turn is a human
       if (!this._isCurrentTurnBot()) {
-        this._startTimer();
+        if (result.movable.length === 1) {
+          // If only 1 option, auto-move it after a 1000ms delay
+          this._handleHumanAutoMove(color, result.movable[0]);
+        } else {
+          // Restart timer for human player's move selection phase
+          this._startTimer();
+        }
       }
     }
   }
@@ -371,6 +378,42 @@ class GameRoom {
         this._handleBotTurnIfNeeded();
       }
     }, 900 + Math.random() * 700);
+  }
+
+  _handleHumanAutoMove(color, tokenId) {
+    setTimeout(async () => {
+      if (!this.game || this.status !== 'playing') return;
+      if (this.game.currentColor !== color || this.game.phase !== 'moving') return;
+
+      this._clearTimer();
+      const result = this.game.moveToken(tokenId);
+      if (!result) return;
+
+      if (result.win) {
+        this.finishOrder.push(result.win);
+        this.status = 'finished';
+      }
+
+      this.io.to(this.roomCode).emit('token-moved', {
+        color,
+        tokenId,
+        captured: result.captured,
+        reachedHome: result.reachedHome,
+        extraTurn: result.extraTurn,
+        win: result.win || null,
+        autoMoved: true,
+        state: this.game.getState(),
+      });
+
+      await this._save();
+      if (this.status === 'finished') {
+        await this._saveHistory('win');
+        return;
+      }
+
+      this._startTimer();
+      this._handleBotTurnIfNeeded();
+    }, 1000);
   }
 
   _getColorForSocket(socketId) {

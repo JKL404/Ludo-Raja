@@ -178,10 +178,14 @@ const GameController = (() => {
       });
     });
 
-    SocketClient.on('token-moved', ({ color, tokenId, captured, reachedHome, extraTurn, win, state }) => {
+    SocketClient.on('token-moved', ({ color, tokenId, captured, reachedHome, extraTurn, win, autoMoved, state }) => {
       currentState = state;
 
       const name = color === myColor ? 'You' : _nameFor(color);
+
+      if (autoMoved && color === myColor) {
+        _addSystemMessage(`⚡ Only one valid move! Auto-moved your token.`);
+      }
 
       if (captured) {
         _addSystemMessage(`💥 ${name} captured ${captured.color.toUpperCase()}'s token!`);
@@ -539,10 +543,68 @@ const GameController = (() => {
     SocketClient.emit('resume-game', {});
   }
 
+  function goBackToLobby() {
+    if (currentState && currentState.phase === 'finished') {
+      sessionStorage.removeItem('ludoRoom');
+      sessionStorage.removeItem('ludoIsHost');
+      sessionStorage.removeItem('ludoColor');
+      window.location.href = '/';
+      return;
+    }
+
+    const overlay = document.getElementById('confirm-overlay');
+    if (!overlay) {
+      if (confirm("Leave the game? You can rejoin later using the room code.")) {
+        sessionStorage.removeItem('ludoRoom');
+        sessionStorage.removeItem('ludoIsHost');
+        sessionStorage.removeItem('ludoColor');
+        window.location.href = '/';
+      }
+      return;
+    }
+
+    // Customize overlay for leaving the game
+    const title = overlay.querySelector('.confirm-title');
+    const msg = overlay.querySelector('.confirm-msg');
+    const okBtn = document.getElementById('confirm-ok-btn');
+
+    if (title) title.textContent = "Leave Game?";
+    if (msg) msg.textContent = "Are you sure you want to leave this game? You can rejoin later using the room code.";
+    if (okBtn) {
+      okBtn.textContent = "Leave Game";
+      okBtn.className = "btn btn-danger btn-lg";
+      okBtn.onclick = () => {
+        sessionStorage.removeItem('ludoRoom');
+        sessionStorage.removeItem('ludoIsHost');
+        sessionStorage.removeItem('ludoColor');
+        window.location.href = '/';
+      };
+    }
+
+    overlay.style.display = 'flex';
+  }
+
   function forceEndGame() {
     if (!isHost) return;
     const overlay = document.getElementById('confirm-overlay');
-    if (overlay) overlay.style.display = 'flex';
+    if (!overlay) return;
+
+    // Customize overlay for ending the game
+    const title = overlay.querySelector('.confirm-title');
+    const msg = overlay.querySelector('.confirm-msg');
+    const okBtn = document.getElementById('confirm-ok-btn');
+
+    if (title) title.textContent = "End Game?";
+    if (msg) msg.textContent = "Are you sure you want to end the game for everyone? This will terminate the session and return all players to the lobby.";
+    if (okBtn) {
+      okBtn.textContent = "End Game";
+      okBtn.className = "btn btn-danger btn-lg";
+      okBtn.onclick = () => {
+        confirmEndGame();
+      };
+    }
+
+    overlay.style.display = 'flex';
   }
 
   function closeConfirmModal() {
@@ -556,7 +618,7 @@ const GameController = (() => {
     SocketClient.emit('force-end-game', {});
   }
 
-  return { init, rollDice, moveToken, sendReaction, sendChat, pauseGame, resumeGame, forceEndGame, closeConfirmModal, confirmEndGame };
+  return { init, rollDice, moveToken, sendReaction, sendChat, pauseGame, resumeGame, forceEndGame, closeConfirmModal, confirmEndGame, goBackToLobby };
 })();
 
 // ---- Boot ----

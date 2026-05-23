@@ -60,6 +60,7 @@
       <div class="tabs">
         <button class="tab active" id="tab-create" onclick="switchTab('create')">Create Game</button>
         <button class="tab" id="tab-join" onclick="switchTab('join')">Join Game</button>
+        <button class="tab" id="tab-history" onclick="switchTab('history')">History</button>
       </div>
 
       <!-- CREATE GAME -->
@@ -140,6 +141,11 @@
         <button class="btn btn-primary btn-lg" style="width:100%" onclick="joinGame()">
           🚪 Join Room
         </button>
+      </div>
+
+      <!-- ROOM HISTORY -->
+      <div class="form-section" id="section-history" style="max-height:380px; overflow-y:auto; padding-right:4px;">
+        <div id="recent-rooms-list"></div>
       </div>
     </div>
 
