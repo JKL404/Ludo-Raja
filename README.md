@@ -14,7 +14,7 @@
 </div>
 
 ---
-![Live Demo: Ludo Raja](https://ludo-raja.onrender.com)
+[Live Demo: Ludo Raja](https://ludo-raja.onrender.com)
 ---
 
 ## ✨ Features
