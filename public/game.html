@@ -105,6 +105,19 @@
     </div>
   </div>
 
+  <!-- Confirm Overlay (hidden) -->
+  <div class="confirm-overlay" id="confirm-overlay" style="display:none">
+    <div class="confirm-card glass">
+      <div class="confirm-icon">⚠️</div>
+      <div class="confirm-title">End Game?</div>
+      <div class="confirm-msg">Are you sure you want to end the game for everyone? This will terminate the session and return all players to the lobby.</div>
+      <div class="confirm-actions">
+        <button class="btn btn-ghost btn-lg" id="confirm-cancel-btn" onclick="GameController.closeConfirmModal()">Cancel</button>
+        <button class="btn btn-danger btn-lg" id="confirm-ok-btn" onclick="GameController.confirmEndGame()">End Game</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Paused Overlay (hidden) -->
   <div class="paused-overlay" id="paused-overlay" style="display:none">
     <div class="paused-card glass">

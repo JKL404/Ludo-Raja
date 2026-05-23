@@ -33,6 +33,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   SocketClient.connect();
   _setupSocketHandlers();
+
+  SocketClient.on('connect', () => {
+    if (roomCode) {
+      const name = sessionStorage.getItem('ludoName') || 'Player';
+      const color = sessionStorage.getItem('ludoColor') || (isHost ? selectedColor : selectedJoinColor);
+      SocketClient.emit('join-room', { roomCode, name, color });
+    }
+  });
 });
 
 function _setupVolToggle() {

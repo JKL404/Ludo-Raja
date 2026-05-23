@@ -28,21 +28,26 @@ const io = new Server(server, {
   allowEIO3: true,
 });
 
-// Configure Redis adapter if REDIS_URL is provided
-if (process.env.REDIS_URL) {
+// Configure Redis adapter if REDIS_URL is provided, or try local Redis in development
+const adapterRedisUrl = process.env.REDIS_URL || (process.env.NODE_ENV !== 'production' ? 'redis://127.0.0.1:6379' : null);
+if (adapterRedisUrl) {
   try {
     const { createAdapter } = require('@socket.io/redis-adapter');
     const { createClient } = require('redis');
-    const pubClient = createClient({ url: process.env.REDIS_URL });
+    const pubClient = createClient({ url: adapterRedisUrl });
     const subClient = pubClient.duplicate();
 
     Promise.all([pubClient.connect(), subClient.connect()])
       .then(() => {
         io.adapter(createAdapter(pubClient, subClient));
-        console.log('[Socket.IO] Connected to Redis Pub/Sub adapter.');
+        console.log(`[Socket.IO] Connected to Redis Pub/Sub adapter at ${adapterRedisUrl}.`);
       })
       .catch((err) => {
-        console.error('[Socket.IO] Redis adapter connection failed:', err.message);
+        if (process.env.REDIS_URL) {
+          console.error('[Socket.IO] Redis adapter connection failed:', err.message);
+        } else {
+          console.log('[Socket.IO] Local Redis not detected, using in-memory Socket.IO adapter.');
+        }
       });
   } catch (err) {
     console.error('[Socket.IO] Failed to load/configure Redis adapter:', err.message);

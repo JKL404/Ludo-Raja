@@ -19,6 +19,11 @@ const GameController = (() => {
 
   // ---- Boot ----
   function init() {
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+    window.scrollTo(0, 0);
+
     SoundEngine.init();
     ParticleSystem.init();
     TimerUI.init();
@@ -68,6 +73,11 @@ const GameController = (() => {
     // Build player panels
     _buildPlayerPanels();
     _updateRollBtn();
+
+    // Ensure we start at the top of the viewport
+    setTimeout(() => {
+      window.scrollTo(0, 0);
+    }, 100);
   }
 
   function _resizeCanvas(canvas) {
@@ -525,11 +535,22 @@ const GameController = (() => {
 
   function forceEndGame() {
     if (!isHost) return;
-    if (!confirm('End the game for everyone?')) return;
+    const overlay = document.getElementById('confirm-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  }
+
+  function closeConfirmModal() {
+    const overlay = document.getElementById('confirm-overlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
+  function confirmEndGame() {
+    if (!isHost) return;
+    closeConfirmModal();
     SocketClient.emit('force-end-game', {});
   }
 
-  return { init, rollDice, moveToken, sendReaction, sendChat, pauseGame, resumeGame, forceEndGame };
+  return { init, rollDice, moveToken, sendReaction, sendChat, pauseGame, resumeGame, forceEndGame, closeConfirmModal, confirmEndGame };
 })();
 
 // ---- Boot ----

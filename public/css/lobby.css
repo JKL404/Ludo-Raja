@@ -13,24 +13,7 @@
   z-index: 1;
 }
 
-/* Floating star particles (galaxy theme) */
-.stars-bg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-.star {
-  position: absolute;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: white;
-  animation: starFloat linear infinite;
-  opacity: 0;
-}
-[data-theme="classic"] .stars-bg { display: none; }
+
 
 /* ---- Hero Header ---- */
 .lobby-header {

@@ -9,7 +9,7 @@ class RoomStore {
   }
 
   async init() {
-    const redisUrl = process.env.REDIS_URL;
+    const redisUrl = process.env.REDIS_URL || (process.env.NODE_ENV !== 'production' ? 'redis://127.0.0.1:6379' : null);
     if (redisUrl) {
       try {
         const { createClient } = require('redis');
@@ -17,7 +17,11 @@ class RoomStore {
         await this.redisClient.connect();
         console.log('[RoomStore] Connected to Redis:', redisUrl);
       } catch (err) {
-        console.error('[RoomStore] Redis connection failed, falling back to memory:', err.message);
+        if (process.env.REDIS_URL) {
+          console.error('[RoomStore] Redis connection failed, falling back to memory:', err.message);
+        } else {
+          console.log('[RoomStore] Local Redis not detected, using in-memory store.');
+        }
         this.redisClient = null;
       }
     } else {

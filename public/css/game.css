@@ -523,14 +523,15 @@
 
 /* ---- Responsive ---- */
 .game-hud {
-  position: relative;
-  z-index: 10;
-  padding: 12px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-glass);
+  padding: 12px max(20px, calc((100% - 1100px) / 2));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  max-width: 1100px;
-  margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
 }
@@ -594,13 +595,17 @@
   .pip { width: 10px; height: 10px; }
 
   .game-hud {
-    padding: 8px 12px;
-    gap: 8px;
+    padding: 8px max(12px, calc((100% - 1100px) / 2));
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
   }
   .turn-banner {
     padding: 6px 12px;
     font-size: 0.8rem;
     gap: 6px;
+    width: 100%;
+    justify-content: center;
   }
   .turn-banner span {
     font-size: 0.75rem !important;
@@ -611,6 +616,9 @@
   }
   .hud-controls {
     gap: 8px;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
   }
   .timer-wrap {
     height: 44px;
