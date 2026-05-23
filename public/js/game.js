@@ -85,7 +85,7 @@ const GameController = (() => {
     if (window.innerWidth > 900) {
       size = Math.min(window.innerWidth - 440, window.innerHeight - 180, 750);
     } else {
-      size = Math.min(window.innerWidth - 24, window.innerHeight - 320, 650);
+      size = Math.min(window.innerWidth - 24, window.innerHeight - 290, 650);
     }
     const finalSize = Math.max(size, 260);
     canvas.width  = finalSize;
@@ -289,24 +289,22 @@ const GameController = (() => {
 
   function _updatePlayerCards(state) {
     const colors = slotConfig.map(s => s.color);
-    const left   = document.getElementById('panel-left');
-    const right  = document.getElementById('panel-right');
-    if (!left || !right) return;
 
     colors.forEach((color, i) => {
-      const card = document.querySelector(`.player-card[data-color="${color}"]`);
-      if (!card) return;
-      card.classList.toggle('active-turn', color === state.currentColor && state.phase !== 'finished');
+      const cards = document.querySelectorAll(`.player-card[data-color="${color}"]`);
+      cards.forEach(card => {
+        card.classList.toggle('active-turn', color === state.currentColor && state.phase !== 'finished');
 
-      // Token home pips
-      const tokens = state.tokens?.[color] || [];
-      const pipEls = card.querySelectorAll('.pc-token-pip');
-      pipEls.forEach((pip, idx) => {
-        const t = tokens[idx];
-        pip.classList.toggle('home', t && t.steps >= 56);
-        pip.style.background = (t && t.steps >= 0 && t.steps < 56)
-          ? TOKEN_COLORS[color]
-          : (t?.steps >= 56 ? '' : 'rgba(255,255,255,0.1)');
+        // Token home pips
+        const tokens = state.tokens?.[color] || [];
+        const pipEls = card.querySelectorAll('.pc-token-pip');
+        pipEls.forEach((pip, idx) => {
+          const t = tokens[idx];
+          pip.classList.toggle('home', t && t.steps >= 56);
+          pip.style.background = (t && t.steps >= 0 && t.steps < 56)
+            ? TOKEN_COLORS[color]
+            : (t?.steps >= 56 ? '' : 'rgba(255,255,255,0.1)');
+        });
       });
     });
   }
@@ -343,14 +341,22 @@ const GameController = (() => {
     const leftColors  = colors.filter((_, i) => i < 2);
     const rightColors = colors.filter((_, i) => i >= 2);
 
-    const panelLeft  = document.getElementById('panel-left');
-    const panelRight = document.getElementById('panel-right');
+    const panelLeft   = document.getElementById('panel-left');
+    const panelRight  = document.getElementById('panel-right');
+    const playerStrip = document.getElementById('player-strip');
 
     leftColors.forEach(color => panelLeft?.insertBefore(_makePlayerCard(color), panelLeft.firstChild));
     rightColors.forEach(color => {
       const existing = panelRight?.querySelector(`[data-color="${color}"]`);
       if (!existing) panelRight?.prepend(_makePlayerCard(color));
     });
+
+    if (playerStrip) {
+      playerStrip.innerHTML = '';
+      colors.forEach(color => {
+        playerStrip.appendChild(_makePlayerCard(color));
+      });
+    }
   }
 
   function _makePlayerCard(color) {

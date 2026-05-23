@@ -252,6 +252,9 @@
   flex-direction: column;
   gap: 12px;
 }
+.player-strip {
+  display: none;
+}
 
 .player-card {
   padding: 16px;
@@ -475,6 +478,63 @@
   margin-bottom: 28px;
 }
 
+/* ---- Confirm (End Game) overlay ---- */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.35s ease;
+}
+.confirm-card {
+  text-align: center;
+  padding: 44px 48px;
+  border-radius: var(--radius-xl);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  max-width: 420px;
+  width: 90%;
+  animation: fadeIn 0.4s ease;
+}
+.confirm-icon {
+  font-size: 3.5rem;
+  margin-bottom: 12px;
+  animation: pulse-glow 2s ease infinite;
+}
+.confirm-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--clr-red);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  text-shadow: 0 0 12px var(--clr-red-glow);
+}
+[data-theme="classic"] .confirm-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 1.5rem;
+  text-shadow: none;
+}
+.confirm-msg {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 28px;
+}
+.confirm-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
 /* ---- Warning button variant ---- */
 .btn-warning {
   background: linear-gradient(135deg, #f59e0b, #d97706);
@@ -566,14 +626,23 @@
 }
 
 @media (max-width: 900px) {
+  .player-strip {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto 16px auto;
+  }
+  #panel-left {
+    display: none;
+  }
+  .player-panel .player-card {
+    display: none;
+  }
   .game-layout {
     grid-template-columns: 1fr;
   }
-  .player-panel {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-  .player-card { flex: 1; min-width: 140px; }
   .side-panel {
     flex: 1;
     min-width: 200px;
@@ -643,6 +712,47 @@
   #btn-lobby {
     font-size: 0.75rem;
     padding: 6px 10px;
+  }
+  .player-strip {
+    max-width: 100%;
+    margin: 0 auto 10px auto;
+  }
+  .player-strip .player-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-radius: var(--radius-md);
+    gap: 8px;
+  }
+  .player-strip .pc-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 0;
+    flex: 1;
+    min-width: 0;
+  }
+  .player-strip .pc-name {
+    font-size: 0.82rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .player-strip .pc-badge {
+    font-size: 0.6rem;
+    padding: 1px 4px;
+    flex-shrink: 0;
+  }
+  .player-strip .pc-tokens {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+  .player-strip .pc-token-pip {
+    width: 10px;
+    height: 10px;
   }
 }
 

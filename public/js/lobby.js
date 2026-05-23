@@ -10,6 +10,7 @@ let roomCode = null;
 let isHost = false;
 let slotConfig = []; // [{color, isBot}]
 const ALL_COLORS = ['red','blue','green','yellow'];
+const DIAGONAL_MAP = { red: 'green', green: 'red', blue: 'yellow', yellow: 'blue' };
 const COLOR_EMOJI = { red:'🔴', blue:'🔵', green:'🟢', yellow:'🟡' };
 
 // ---- Init ----
@@ -31,8 +32,37 @@ document.addEventListener('DOMContentLoaded', () => {
     _updateJoinColors(e.target.value.trim());
   });
 
+  // Restore active room session if page was reloaded/re-opened
+  const savedRoom = sessionStorage.getItem('ludoRoom');
+  if (savedRoom && savedRoom.length === 6) {
+    roomCode = savedRoom;
+    isHost = sessionStorage.getItem('ludoIsHost') === 'true';
+    document.getElementById('display-room-code').textContent = roomCode;
+    document.getElementById('waiting-room').style.display = 'block';
+    const lobbyCard = document.querySelector('.lobby-card');
+    if (lobbyCard) lobbyCard.style.display = 'none';
+
+    // Show WiFi hint
+    const wifiEl = document.getElementById('wifi-url');
+    if (wifiEl) wifiEl.textContent = `http://<your-ip>:3000  (run: ipconfig getifaddr en0)`;
+  }
+
   SocketClient.connect();
   _setupSocketHandlers();
+
+  // Handle share link: ?join=XXXXXX auto-fills room code and switches to Join tab
+  const urlParams = new URLSearchParams(window.location.search);
+  const joinCode = urlParams.get('join');
+  if (joinCode && joinCode.length === 6) {
+    const codeInput = document.getElementById('join-code');
+    if (codeInput) {
+      codeInput.value = joinCode.toUpperCase();
+      switchTab('join');
+      _updateJoinColors(joinCode.toUpperCase());
+    }
+    // Clean the URL without reloading
+    window.history.replaceState({}, '', window.location.pathname);
+  }
 
   SocketClient.on('connect', () => {
     if (roomCode) {
@@ -109,8 +139,17 @@ function removeSlot(idx) {
 
 function addSlot() {
   const used = slotConfig.map(s => s.color);
-  const next = ALL_COLORS.find(c => !used.includes(c));
-  if (!next || slotConfig.length >= 4) return;
+  if (slotConfig.length >= 4) return;
+  // For the 2nd slot, prefer diagonal color for better gameplay
+  let next;
+  if (slotConfig.length === 1) {
+    const hostColor = slotConfig[0].color;
+    const diagonal = DIAGONAL_MAP[hostColor];
+    next = !used.includes(diagonal) ? diagonal : ALL_COLORS.find(c => !used.includes(c));
+  } else {
+    next = ALL_COLORS.find(c => !used.includes(c));
+  }
+  if (!next) return;
   slotConfig.push({ color: next, isBot: true });
   _renderSlots();
 }
@@ -197,7 +236,8 @@ async function _updateJoinColors(code) {
       histCard.style.display = 'block';
       histCard.innerHTML = _renderHistoryCard(h);
     } else {
-      histCard.style.display = 'none';
+      histCard.style.display = 'block';
+      histCard.innerHTML = '<div class="history-card" style="text-align:center;padding:12px;color:var(--text-muted);font-size:0.85rem;">No previous games found for this room</div>';
     }
   }
 }
@@ -237,6 +277,7 @@ async function createGame() {
   if (slotConfig.length < 2) { showToast('Add at least 2 slots', 'error'); return; }
 
   sessionStorage.setItem('ludoName', name);
+  sessionStorage.setItem('ludoIsHost', 'true');
 
   const res  = await fetch('/api/rooms', { method: 'POST' });
   const data = await res.json();
@@ -267,6 +308,7 @@ function joinGame() {
   if (code.length !== 6) { showToast('Enter a valid 6-letter room code', 'error'); return; }
 
   sessionStorage.setItem('ludoName', name);
+  sessionStorage.setItem('ludoIsHost', 'false');
   roomCode = code;
   isHost   = false;
 
@@ -289,7 +331,8 @@ function startGame() {
 // ---- Copy room code ----
 function copyRoomCode() {
   if (roomCode) {
-    navigator.clipboard.writeText(roomCode).then(() => showToast('Room code copied!', 'success'));
+    const shareUrl = `${window.location.origin}/?join=${roomCode}`;
+    navigator.clipboard.writeText(shareUrl).then(() => showToast('Share link copied!', 'success'));
   }
 }
 
@@ -303,6 +346,12 @@ function _setupSocketHandlers() {
   SocketClient.on('error', (data) => {
     document.getElementById('waiting-room').style.display = 'none';
     document.querySelector('.lobby-card').style.display = 'block';
+    
+    // Clear room session to prevent reconnect loop on error
+    sessionStorage.removeItem('ludoRoom');
+    sessionStorage.removeItem('ludoIsHost');
+    sessionStorage.removeItem('ludoColor');
+
     if (data && data.message) {
       showToast(data.message, 'error');
     }
@@ -376,4 +425,11 @@ function showToast(msg, type = 'info') {
 
 function escapeHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function leaveRoom() {
+  sessionStorage.removeItem('ludoRoom');
+  sessionStorage.removeItem('ludoIsHost');
+  sessionStorage.removeItem('ludoColor');
+  window.location.reload();
 }

@@ -126,6 +126,10 @@ class GameRoom {
     if (result.movable.length > 0) {
       // If current turn is a bot, schedule bot move
       this._handleBotMoveIfNeeded(result.movable);
+      // Restart timer for human player's move selection phase
+      if (!this._isCurrentTurnBot()) {
+        this._startTimer();
+      }
     }
   }
 
@@ -248,12 +252,41 @@ class GameRoom {
     this._save(); // Asynchronously save timer start state
     this.timer = setTimeout(async () => {
       if (this.game && this.status === 'playing') {
-        this.game.skipTurn();
-        this.io.to(this.roomCode).emit('turn-skipped', {
-          reason: 'timeout',
-          state: this.game.getState(),
-        });
-        await this._save();
+        // Check if we're in the moving phase (player rolled but hasn't picked a token)
+        if (this.game.phase === 'moving' && this.game.movableTokens.length > 0) {
+          // Auto-pick the best token using BotPlayer AI
+          const movableIds = this.game.movableTokens.map(t => t.id);
+          const tokenId = BotPlayer.chooseMove(this.game, movableIds);
+          const color = this.game.currentColor;
+          this._clearTimer();
+          const result = this.game.moveToken(tokenId);
+          if (result) {
+            if (result.win) {
+              this.finishOrder.push(result.win);
+              this.status = 'finished';
+            }
+            this.io.to(this.roomCode).emit('token-moved', {
+              color,
+              tokenId,
+              captured: result.captured,
+              reachedHome: result.reachedHome,
+              extraTurn: result.extraTurn,
+              win: result.win || null,
+              autoMoved: true,
+              state: this.game.getState(),
+            });
+            await this._save();
+            if (this.status === 'finished') { await this._saveHistory('win'); return; }
+          }
+        } else {
+          // Rolling phase timeout — skip turn entirely
+          this.game.skipTurn();
+          this.io.to(this.roomCode).emit('turn-skipped', {
+            reason: 'timeout',
+            state: this.game.getState(),
+          });
+          await this._save();
+        }
         this._startTimer();
         this._handleBotTurnIfNeeded();
       }
