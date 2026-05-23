@@ -207,7 +207,7 @@ class LudoGame {
   _stepsToMainIndex(color, steps) {
     if (steps < 0 || steps >= TOTAL_MAIN_PATH) return null;
     const entry = COLOR_ENTRY[color];
-    return (entry + steps) % TOTAL_MAIN_PATH;
+    return (entry + steps) % MAIN_PATH.length;
   }
 
   // Get [col,row] for a token's current position (for rendering)
@@ -223,7 +223,7 @@ class LudoGame {
 
     // On main path
     const entry = COLOR_ENTRY[color];
-    const pathIdx = (entry + steps) % TOTAL_MAIN_PATH;
+    const pathIdx = (entry + steps) % MAIN_PATH.length;
     return MAIN_PATH[pathIdx];
   }
 

@@ -65,7 +65,7 @@ class BotPlayer {
             const otIdx = _stepsToMainIndex(oppColor, ot.steps);
             // Opponent within 6 steps of our token (threat)
             if (otIdx !== null) {
-              const dist = (curMainIdx - otIdx + TOTAL_MAIN_PATH) % TOTAL_MAIN_PATH;
+              const dist = (curMainIdx - otIdx + MAIN_PATH.length) % MAIN_PATH.length;
               if (dist <= 6 && dist > 0) {
                 score += 150; // moving away from danger
               }
@@ -90,7 +90,7 @@ class BotPlayer {
 function _stepsToMainIndex(color, steps) {
   if (steps < 0 || steps >= TOTAL_MAIN_PATH) return null;
   const entry = COLOR_ENTRY[color];
-  return (entry + steps) % TOTAL_MAIN_PATH;
+  return (entry + steps) % MAIN_PATH.length;
 }
 
 module.exports = BotPlayer;

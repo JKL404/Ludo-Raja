@@ -23,6 +23,7 @@ class GameRoom {
     this.finishOrder = []; // colors in order of finishing
     this.status = 'waiting'; // 'waiting' | 'playing' | 'finished'
     this.hostSocketId = null;
+    this.hostColor = null; // Stable color of the host — survives socket reconnects
     this.rankings = []; // final rankings
   }
 
@@ -44,8 +45,12 @@ class GameRoom {
     }
     this.players[socketId] = { name, color, isBot: false };
     this.colorMap[color] = socketId;
-    if (!this.hostSocketId || this.hostSocketId === oldSocketId) {
+    // Update hostSocketId when: first player, same socket replaced, host's socket
+    // disconnected (no longer in players), or this color IS the host's color
+    const hostGone = this.hostSocketId && !this.players[this.hostSocketId];
+    if (!this.hostSocketId || this.hostSocketId === oldSocketId || hostGone) {
       this.hostSocketId = socketId;
+      this.hostColor = color;
     }
     await this._save();
   }
@@ -386,6 +391,7 @@ class GameRoom {
       finishOrder: this.finishOrder,
       status: this.status,
       hostSocketId: this.hostSocketId,
+      hostColor: this.hostColor,
       rankings: this.rankings,
     };
   }
@@ -401,6 +407,7 @@ class GameRoom {
     room.finishOrder = data.finishOrder || [];
     room.status = data.status || 'waiting';
     room.hostSocketId = data.hostSocketId;
+    room.hostColor = data.hostColor || null;
     room.rankings = data.rankings || [];
     room.timerStart = data.timerStart || null;
     room.startedAt = data.startedAt || null;

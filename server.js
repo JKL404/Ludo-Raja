@@ -152,7 +152,7 @@ io.on('connection', (socket) => {
       // Send the current game state immediately to the rejoining player
       socket.emit('game-started', {
         slotConfig: room.slotConfig,
-        hostColor: room.players[room.hostSocketId]?.color || null,
+        hostColor: room.hostColor,
         theme: room.theme,
         state: room.game.getState(),
         isPaused,
@@ -184,10 +184,9 @@ io.on('connection', (socket) => {
     }
 
     const state = await room.startGame(slotConfig, theme);
-    const hostColor = room.players[room.hostSocketId]?.color || null;
     io.to(roomCode).emit('game-started', {
       slotConfig: room.slotConfig, // enriched with real player names
-      hostColor,
+      hostColor: room.hostColor,
       theme,
       state,
     });

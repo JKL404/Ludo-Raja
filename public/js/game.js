@@ -288,10 +288,10 @@ const GameController = (() => {
       const pipEls = card.querySelectorAll('.pc-token-pip');
       pipEls.forEach((pip, idx) => {
         const t = tokens[idx];
-        pip.classList.toggle('home', t && t.steps >= 58);
-        pip.style.background = (t && t.steps >= 0 && t.steps < 58)
+        pip.classList.toggle('home', t && t.steps >= 56);
+        pip.style.background = (t && t.steps >= 0 && t.steps < 56)
           ? TOKEN_COLORS[color]
-          : (t?.steps >= 58 ? '' : 'rgba(255,255,255,0.1)');
+          : (t?.steps >= 56 ? '' : 'rgba(255,255,255,0.1)');
       });
     });
   }

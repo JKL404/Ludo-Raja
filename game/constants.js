@@ -86,9 +86,9 @@ const HOME_ZONE_COLORS = {
 };
 
 // Starting token positions (for game init) — token starts in yard (position = -1)
-const TOTAL_MAIN_PATH = 52;
-const HOME_COL_LENGTH = 6;
-const TOTAL_STEPS = TOTAL_MAIN_PATH + HOME_COL_LENGTH; // 58 steps from entry to home finish
+const TOTAL_MAIN_PATH = 51;
+const HOME_COL_LENGTH = 5;
+const TOTAL_STEPS = TOTAL_MAIN_PATH + HOME_COL_LENGTH; // 56 steps from entry to home finish
 
 module.exports = {
   COLORS,

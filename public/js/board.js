@@ -542,7 +542,7 @@ const BoardRenderer = (() => {
     tokenLayoutMap = {};
     if (!gameState?.tokens) return;
     const c = cellSize;
-    const TOTAL_MAIN = 52, HOME_COL_LEN = 6, TOTAL_STEPS = TOTAL_MAIN + HOME_COL_LEN;
+    const TOTAL_MAIN = 51, HOME_COL_LEN = 5, TOTAL_STEPS = TOTAL_MAIN + HOME_COL_LEN;
 
     // Group active tokens by cell key: "col,row"
     const cellGroups = {};
@@ -726,13 +726,13 @@ const BoardRenderer = (() => {
   }
 
   function _getTokenCell(color, steps) {
-    const TOTAL_MAIN = 52, HOME_COL_LEN = 6, TOTAL_STEPS = TOTAL_MAIN + HOME_COL_LEN;
+    const TOTAL_MAIN = 51, HOME_COL_LEN = 5, TOTAL_STEPS = TOTAL_MAIN + HOME_COL_LEN;
     if (steps < 0 || steps >= TOTAL_STEPS) return null;
     if (steps >= TOTAL_MAIN) {
       return HOME_COLUMNS[color][steps - TOTAL_MAIN] || null;
     }
     const entry = COLOR_ENTRY[color];
-    return MAIN_PATH[(entry + steps) % TOTAL_MAIN];
+    return MAIN_PATH[(entry + steps) % MAIN_PATH.length];
   }
 
   // ---- Click/hover handling ----
