@@ -15,7 +15,7 @@
 
 .game-layout {
   display: grid;
-  grid-template-columns: 200px 1fr 200px;
+  grid-template-columns: 1fr 300px;
   gap: 16px;
   width: 100%;
   max-width: 1250px;
@@ -252,11 +252,15 @@
   flex-direction: column;
   gap: 12px;
 }
+#panel-left {
+  display: none !important;
+}
 .player-strip {
-  display: none;
+  display: none !important;
 }
 
 .player-card {
+  display: none !important;
   padding: 16px;
   border-radius: var(--radius-lg);
   border: 2px solid transparent;

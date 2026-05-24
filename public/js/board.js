@@ -189,7 +189,7 @@ const BoardRenderer = (() => {
         return;
       }
       
-      const stepDuration = 180;
+      const stepDuration = 250; // slower hop
       const fromStep = current;
       current++;
       const toStep = current;
@@ -202,6 +202,9 @@ const BoardRenderer = (() => {
         animatingToken = {
           color,
           id,
+          coglow: false,
+          glowSize: 2,
+          scaleUpOnSpawn: false,
           fromX: fromCoords.x,
           fromY: fromCoords.y,
           toX: toCoords.x,
@@ -368,6 +371,14 @@ const BoardRenderer = (() => {
 
     _drawBoard();
     if (gameState) _drawTokens();
+
+    // Draw Player Name Badges
+    try {
+      const slots = JSON.parse(sessionStorage.getItem('ludoSlots') || '[]');
+      slots.forEach(slot => {
+        _drawPlayerNameBadge(slot.color);
+      });
+    } catch (e) {}
 
     ctx.restore();
   }
@@ -727,6 +738,16 @@ const BoardRenderer = (() => {
       const cy = row * c + c/2;
 
       const count = group.length;
+      if (intensity === 'high') { // Capture / Home
+        count = 40; // reduced burst count
+        speedMult = 1.5;
+        decayMult = 0.8;
+        isCapture = true;
+      } else if (intensity === 'low') { // standard hop step
+        count = 6; // slightly fewer particles per hop
+        speedMult = 0.6;
+        decayMult = 1.5; // fades very fast
+      }
       if (count === 1) {
         // Center perfectly
         const t = group[0];
@@ -779,7 +800,7 @@ const BoardRenderer = (() => {
         if (animatingToken && animatingToken.color === color && animatingToken.id === i) {
           const elapsed = Date.now() - animatingToken.startTime;
           const progress = Math.min(1.0, elapsed / animatingToken.duration);
-          const bounce = Math.sin(progress * Math.PI) * cellSize * 0.45;
+          const bounce = Math.sin(progress * Math.PI) * cellSize * 0.25; // reduced bounce height
           
           drawX = animatingToken.fromX + (animatingToken.toX - animatingToken.fromX) * progress;
           drawY = animatingToken.fromY + (animatingToken.toY - animatingToken.fromY) * progress - bounce;
@@ -978,6 +999,105 @@ const BoardRenderer = (() => {
       ctx.fillRect(-dSize, -dSize, dSize * 2, dSize * 2);
       ctx.restore();
     }
+
+    ctx.restore();
+  }
+
+  function _getPlayerInfo(color) {
+    try {
+      const slots = JSON.parse(sessionStorage.getItem('ludoSlots') || '[]');
+      const slot = slots.find(s => s.color === color);
+      if (slot) {
+        return {
+          name: slot.name || color.toUpperCase(),
+          isBot: !!slot.isBot,
+          isMe: color === myColor
+        };
+      }
+    } catch (e) {}
+    
+    return {
+      name: color.toUpperCase(),
+      isBot: false,
+      isMe: color === myColor
+    };
+  }
+
+  function _drawPlayerNameBadge(color) {
+    const info = _getPlayerInfo(color);
+    if (!info) return;
+
+    const c = cellSize;
+    let bx = 0, by = 0;
+    if (color === 'red') { bx = 3 * c; by = 0.65 * c; }
+    else if (color === 'green') { bx = 12 * c; by = 0.65 * c; }
+    else if (color === 'blue') { bx = 3 * c; by = 14.35 * c; }
+    else if (color === 'yellow') { bx = 12 * c; by = 14.35 * c; }
+
+    const isCurrentTurn = gameState && gameState.currentColor === color && gameState.phase !== 'finished';
+
+    ctx.save();
+    ctx.translate(bx, by);
+
+    const angle = _getViewRotationAngle();
+    if (angle !== 0) {
+      ctx.rotate(-angle);
+    }
+
+    const badgeW = c * 3.3;
+    const badgeH = c * 0.72;
+
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    
+    if (theme === 'classic') {
+      ctx.fillStyle = isCurrentTurn ? '#ffd700' : '#fdfaf2';
+      ctx.strokeStyle = '#5d4037';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.roundRect(-badgeW / 2, -badgeH / 2, badgeW, badgeH, 6);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = 'rgba(13, 13, 43, 0.82)';
+      ctx.strokeStyle = isCurrentTurn ? TOKEN_COLORS[color] : 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = isCurrentTurn ? 2 : 1;
+      if (isCurrentTurn) {
+        ctx.shadowColor = TOKEN_COLORS[color];
+        ctx.shadowBlur = 12 + Math.sin(Date.now() / 150) * 4;
+      }
+      ctx.beginPath();
+      ctx.roundRect(-badgeW / 2, -badgeH / 2, badgeW, badgeH, 8);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    ctx.shadowBlur = 0;
+
+    let textOffset = 0;
+    if (isCurrentTurn) {
+      const dotR = c * 0.08;
+      ctx.fillStyle = theme === 'classic' ? '#c0392b' : TOKEN_COLORS[color];
+      ctx.beginPath();
+      ctx.arc(-badgeW / 2 + c * 0.35, 0, dotR * (1.0 + Math.abs(Math.sin(Date.now() / 150)) * 0.35), 0, Math.PI * 2);
+      ctx.fill();
+      textOffset = c * 0.22;
+    }
+
+    ctx.font = `bold ${c * 0.34}px Outfit, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    let displayName = info.name;
+    if (info.isBot) displayName += ' 🤖';
+    else if (info.isMe) displayName += ' (You)';
+
+    if (displayName.length > 14) displayName = displayName.substring(0, 12) + '...';
+
+    ctx.fillStyle = theme === 'classic' 
+      ? (isCurrentTurn ? '#1a0e06' : '#5d4037')
+      : '#ffffff';
+    ctx.fillText(displayName, textOffset / 2, 0);
 
     ctx.restore();
   }
