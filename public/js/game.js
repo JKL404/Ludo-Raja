@@ -66,7 +66,8 @@ const GameController = (() => {
     // After connect, re-join room
     SocketClient.on('connect', () => {
       if (roomCode && myColor) {
-        SocketClient.emit('join-room', { roomCode, name: myName, color: myColor });
+        const userId = SocketClient.getUserId();
+        SocketClient.emit('join-room', { roomCode, name: myName, color: myColor, userId });
       }
     });
 

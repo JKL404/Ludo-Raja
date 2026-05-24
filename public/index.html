@@ -88,22 +88,14 @@
           <input class="input" type="text" id="create-name" placeholder="Enter your name…" maxlength="20" autocomplete="off"/>
         </div>
 
-        <!-- Your Color -->
+        <!-- Player Count -->
         <div class="form-group">
-          <label class="form-label">Your Color</label>
-          <div class="color-grid">
-            <div class="color-option red selected" data-color="red" onclick="selectColor('red')">🔴</div>
-            <div class="color-option blue" data-color="blue" onclick="selectColor('blue')">🔵</div>
-            <div class="color-option green" data-color="green" onclick="selectColor('green')">🟢</div>
-            <div class="color-option yellow" data-color="yellow" onclick="selectColor('yellow')">🟡</div>
+          <label class="form-label">Number of Players</label>
+          <div class="player-count-selector">
+            <button type="button" class="count-btn" data-count="2" onclick="setPlayerCount(2)">2 Players</button>
+            <button type="button" class="count-btn" data-count="3" onclick="setPlayerCount(3)">3 Players</button>
+            <button type="button" class="count-btn selected" data-count="4" onclick="setPlayerCount(4)">4 Players</button>
           </div>
-        </div>
-
-        <!-- Player Slots -->
-        <div class="form-group">
-          <label class="form-label">Player Slots</label>
-          <div class="slots-config" id="slots-config"></div>
-          <button class="add-slot-btn" id="add-slot-btn" onclick="addSlot()">+ Add Player Slot</button>
         </div>
 
         <button class="btn btn-primary btn-lg" style="width:100%" onclick="createGame()">
@@ -125,15 +117,7 @@
             autocomplete="off"/>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Your Color</label>
-          <div class="color-grid" id="join-color-grid">
-            <div class="color-option red selected" data-color="red" onclick="selectJoinColor('red')">🔴</div>
-            <div class="color-option blue" data-color="blue" onclick="selectJoinColor('blue')">🔵</div>
-            <div class="color-option green" data-color="green" onclick="selectJoinColor('green')">🟢</div>
-            <div class="color-option yellow" data-color="yellow" onclick="selectJoinColor('yellow')">🟡</div>
-          </div>
-        </div>
+
 
         <!-- Last game result for this room code -->
         <div id="room-history-card" style="display:none"></div>

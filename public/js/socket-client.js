@@ -46,7 +46,16 @@ const SocketClient = (() => {
 
   function getSocketId() { return socket?.id; }
 
-  return { connect, on, emit, getSocketId };
+  function getUserId() {
+    let uid = sessionStorage.getItem('ludoUserId');
+    if (!uid) {
+      uid = 'usr_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      sessionStorage.setItem('ludoUserId', uid);
+    }
+    return uid;
+  }
+
+  return { connect, on, emit, getSocketId, getUserId };
 })();
 
 window.SocketClient = SocketClient;

@@ -126,8 +126,10 @@ app.get('/health', (_req, res) => res.status(200).json({ status: 'ok', uptime: p
 
 // Create a room
 app.post('/api/rooms', async (req, res) => {
+  const { maxPlayers } = req.body;
   const roomCode = _generateCode();
   const room = new GameRoom(roomCode, io, roomStore);
+  room.maxPlayers = maxPlayers || 4;
   rooms[roomCode] = room;
   await roomStore.saveRoom(room);
   res.json({ roomCode });
@@ -152,37 +154,50 @@ io.on('connection', (socket) => {
   console.log(`[+] Socket connected: ${socket.id}`);
 
   // Join a room as a player
-  socket.on('join-room', async ({ roomCode, name, color }) => {
+  socket.on('join-room', async ({ roomCode, name, color, userId }) => {
     roomCode = roomCode.toUpperCase();
     const room = await getRoom(roomCode);
     if (!room) {
       socket.emit('error', { message: 'Room not found' });
       return;
     }
+
+    // Determine player color based on userId or next free slot
+    let assignedColor = color;
+    if (room.userIdMap && room.userIdMap[userId]) {
+      assignedColor = room.userIdMap[userId];
+    } else {
+      const allowedColors = room.getAllowedColors();
+      const takenColors = Object.values(room.players).map(p => p.color);
+      const freeColor = allowedColors.find(c => !takenColors.includes(c));
+      if (!freeColor) {
+        socket.emit('error', { message: 'Room is full' });
+        return;
+      }
+      assignedColor = freeColor;
+    }
+
     if (room.status !== 'waiting') {
       // Allow re-joining any non-bot slot in a live or paused game.
-      // We intentionally don't check whether the old socket is still connected —
-      // there is a race window where the lobby socket hasn't disconnected yet
-      // right after game start, which would otherwise block the first load of game.html.
       const isRejoining = (room.status === 'playing' || room.status === 'paused') &&
-                          room.slotConfig.some(s => s.color === color && !s.isBot);
+                          room.slotConfig.some(s => s.color === assignedColor && !s.isBot);
       if (!isRejoining) {
         socket.emit('error', { message: 'Game already started' });
         return;
       }
     } else {
       // If lobby is waiting, make sure color isn't already taken by another human player
-      const existingSocketId = room.colorMap[color];
+      const existingSocketId = room.colorMap[assignedColor];
       if (existingSocketId && room.players[existingSocketId] && existingSocketId !== socket.id) {
-        socket.emit('error', { message: `Color ${color.toUpperCase()} is already taken!` });
+        socket.emit('error', { message: `Color ${assignedColor.toUpperCase()} is already taken!` });
         return;
       }
     }
 
     socket.join(roomCode);
     socket.roomCode = roomCode;
-    socket.playerColor = color;
-    await room.joinPlayer(socket.id, name, color);
+    socket.playerColor = assignedColor;
+    await room.joinPlayer(socket.id, name, assignedColor, userId);
 
     if (room.status === 'playing' || room.status === 'paused') {
       const isPaused = room.status === 'paused';
@@ -203,15 +218,18 @@ io.on('connection', (socket) => {
     } else {
       io.to(roomCode).emit('room-updated', room.getRoomInfo());
     }
-    socket.emit('joined', { color, roomCode });
-    console.log(`[+] ${name} (${color}) joined room ${roomCode}`);
+    socket.emit('joined', { color: assignedColor, roomCode });
+    console.log(`[+] ${name} (${assignedColor}) joined room ${roomCode}`);
   });
 
   // Start the game
-  socket.on('start-game', async ({ roomCode, slotConfig, theme }) => {
+  socket.on('start-game', async ({ roomCode, theme }) => {
     roomCode = roomCode?.toUpperCase() || socket.roomCode;
     const room = await getRoom(roomCode);
     if (!room || room.hostSocketId !== socket.id) return;
+
+    // Automatically build slotConfig on start (empty slots become bots)
+    const slotConfig = room.buildStartSlotConfig();
 
     // Register bot slots (colorMap = null)
     for (const slot of slotConfig) {

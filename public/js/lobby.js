@@ -4,11 +4,9 @@
 
 // ---- State ----
 let selectedTheme = 'galaxy';
-let selectedColor = 'red';
-let selectedJoinColor = 'red';
 let roomCode = null;
 let isHost = false;
-let slotConfig = []; // [{color, isBot}]
+let maxPlayers = 4;
 const ALL_COLORS = ['red','blue','green','yellow'];
 const DIAGONAL_MAP = { red: 'green', green: 'red', blue: 'yellow', yellow: 'blue' };
 const COLOR_EMOJI = { red:'🔴', blue:'🔵', green:'🟢', yellow:'🟡' };
@@ -18,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
   SoundEngine.init();
   _setupVolToggle();
   _generateStars();
-  _initSlots();
 
   // Default pre-fill name
   const saved = sessionStorage.getItem('ludoName');
@@ -27,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('join-name').value   = saved;
   }
 
-  // Update join color grid when room code is typed
+  // Update join history when room code is typed
   document.getElementById('join-code')?.addEventListener('input', (e) => {
     _updateJoinColors(e.target.value.trim());
   });
@@ -67,8 +64,9 @@ document.addEventListener('DOMContentLoaded', () => {
   SocketClient.on('connect', () => {
     if (roomCode) {
       const name = sessionStorage.getItem('ludoName') || 'Player';
-      const color = sessionStorage.getItem('ludoColor') || (isHost ? selectedColor : selectedJoinColor);
-      SocketClient.emit('join-room', { roomCode, name, color });
+      const color = sessionStorage.getItem('ludoColor');
+      const userId = SocketClient.getUserId();
+      SocketClient.emit('join-room', { roomCode, name, color, userId });
     }
   });
 });
@@ -96,62 +94,11 @@ function _generateStars() {
   }
 }
 
-function _initSlots() {
-  // Default: 1 human (host) + rest TBD
-  slotConfig = [{ color: 'red', isBot: false, isHost: true }];
-  _renderSlots();
-}
-
-function _renderSlots() {
-  const container = document.getElementById('slots-config');
-  if (!container) return;
-  container.innerHTML = '';
-
-  slotConfig.forEach((slot, idx) => {
-    const row = document.createElement('div');
-    row.className = 'slot-row';
-    row.innerHTML = `
-      <div class="slot-dot ${slot.color}"></div>
-      <div class="slot-color-name">${slot.color}</div>
-      <div class="slot-toggle">
-        <button class="${!slot.isBot ? 'active' : ''}" onclick="setSlotType(${idx}, false)">Human</button>
-        <button class="${slot.isBot ? 'active bot' : ''}" onclick="setSlotType(${idx}, true)">Bot 🤖</button>
-      </div>
-      ${idx > 0 ? `<button class="slot-remove" onclick="removeSlot(${idx})">✕</button>` : ''}
-    `;
-    container.appendChild(row);
+function setPlayerCount(count) {
+  maxPlayers = count;
+  document.querySelectorAll('.player-count-selector .count-btn').forEach(btn => {
+    btn.classList.toggle('selected', parseInt(btn.dataset.count) === count);
   });
-
-  // Show/hide add button
-  const addBtn = document.getElementById('add-slot-btn');
-  if (addBtn) addBtn.style.display = slotConfig.length >= 4 ? 'none' : 'block';
-}
-
-function setSlotType(idx, isBot) {
-  slotConfig[idx].isBot = isBot;
-  _renderSlots();
-}
-
-function removeSlot(idx) {
-  slotConfig.splice(idx, 1);
-  _renderSlots();
-}
-
-function addSlot() {
-  const used = slotConfig.map(s => s.color);
-  if (slotConfig.length >= 4) return;
-  // For the 2nd slot, prefer diagonal color for better gameplay
-  let next;
-  if (slotConfig.length === 1) {
-    const hostColor = slotConfig[0].color;
-    const diagonal = DIAGONAL_MAP[hostColor];
-    next = !used.includes(diagonal) ? diagonal : ALL_COLORS.find(c => !used.includes(c));
-  } else {
-    next = ALL_COLORS.find(c => !used.includes(c));
-  }
-  if (!next) return;
-  slotConfig.push({ color: next, isBot: true });
-  _renderSlots();
 }
 
 // ---- Tab switching ----
@@ -175,75 +122,25 @@ function selectTheme(t) {
   document.getElementById('theme-classic').classList.toggle('selected', t === 'classic');
 }
 
-// ---- Color selection ----
-function selectColor(c) {
-  const oldColor = selectedColor;
-  selectedColor = c;
-  if (slotConfig[0]) {
-    // If the color c is already used by another slot, swap it with the old color
-    const existingIdx = slotConfig.findIndex((s, idx) => idx > 0 && s.color === c);
-    if (existingIdx !== -1) {
-      slotConfig[existingIdx].color = oldColor;
-    }
-    slotConfig[0].color = c;
-    _renderSlots();
-  }
-  document.querySelectorAll('.color-grid .color-option').forEach(el => {
-    el.classList.toggle('selected', el.dataset.color === c);
-  });
-}
-
-function selectJoinColor(c) {
-  const el = document.querySelector(`#join-color-grid .color-option[data-color="${c}"]`);
-  if (el && el.classList.contains('taken')) return;
-  selectedJoinColor = c;
-  document.querySelectorAll('#join-color-grid .color-option').forEach(el => {
-    el.classList.toggle('selected', el.dataset.color === c);
-  });
-}
-
 async function _updateJoinColors(code) {
-  const grid = document.getElementById('join-color-grid');
   const histCard = document.getElementById('room-history-card');
-  if (!grid) return;
+  if (!histCard) return;
 
   if (code.length !== 6) {
-    grid.querySelectorAll('.color-option').forEach(el => el.classList.remove('taken'));
-    if (histCard) histCard.style.display = 'none';
+    histCard.style.display = 'none';
     return;
   }
 
   const upper = code.toUpperCase();
+  const histRes = await fetch(`/api/history/${upper}`).catch(() => null);
 
-  // Fetch room info and history in parallel
-  const [roomRes, histRes] = await Promise.all([
-    fetch(`/api/rooms/${upper}`).catch(() => null),
-    fetch(`/api/history/${upper}`).catch(() => null),
-  ]);
-
-  // Update taken colors
-  if (roomRes?.ok) {
-    const info = await roomRes.json();
-    const takenColors = (info.players || []).map(p => p.color);
-    grid.querySelectorAll('.color-option').forEach(el => {
-      el.classList.toggle('taken', takenColors.includes(el.dataset.color));
-    });
-    if (takenColors.includes(selectedJoinColor)) {
-      const free = ALL_COLORS.find(c => !takenColors.includes(c));
-      if (free) selectJoinColor(free);
-    }
-  }
-
-  // Show last game history card if available
-  if (histCard) {
-    if (histRes?.ok) {
-      const h = await histRes.json();
-      histCard.style.display = 'block';
-      histCard.innerHTML = _renderHistoryCard(h);
-    } else {
-      histCard.style.display = 'block';
-      histCard.innerHTML = '<div class="history-card" style="text-align:center;padding:12px;color:var(--text-muted);font-size:0.85rem;">No previous games found for this room</div>';
-    }
+  if (histRes?.ok) {
+    const h = await histRes.json();
+    histCard.style.display = 'block';
+    histCard.innerHTML = _renderHistoryCard(h);
+  } else {
+    histCard.style.display = 'block';
+    histCard.innerHTML = '<div class="history-card" style="text-align:center;padding:12px;color:var(--text-muted);font-size:0.85rem;">No previous games found for this room</div>';
   }
 }
 
@@ -279,22 +176,20 @@ function _renderHistoryCard(h) {
 async function createGame() {
   const name = document.getElementById('create-name').value.trim();
   if (!name) { showToast('Please enter your name', 'error'); return; }
-  if (slotConfig.length < 2) { showToast('Add at least 2 slots', 'error'); return; }
 
   sessionStorage.setItem('ludoName', name);
-  sessionStorage.setItem('ludoIsHost', 'true');
 
-  const res  = await fetch('/api/rooms', { method: 'POST' });
+  const res  = await fetch('/api/rooms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ maxPlayers })
+  });
   const data = await res.json();
   roomCode   = data.roomCode;
-  isHost     = true;
   saveRecentRoom(roomCode);
 
-  // Make sure host color is first slot
-  slotConfig[0].color = selectedColor;
-  slotConfig[0].isBot = false;
-
-  SocketClient.emit('join-room', { roomCode, name, color: selectedColor });
+  const userId = SocketClient.getUserId();
+  SocketClient.emit('join-room', { roomCode, name, color: null, userId });
   document.getElementById('display-room-code').textContent = roomCode;
   document.getElementById('waiting-room').style.display = 'block';
 
@@ -314,12 +209,11 @@ function joinGame() {
   if (code.length !== 6) { showToast('Enter a valid 6-letter room code', 'error'); return; }
 
   sessionStorage.setItem('ludoName', name);
-  sessionStorage.setItem('ludoIsHost', 'false');
   roomCode = code;
-  isHost   = false;
   saveRecentRoom(code);
 
-  SocketClient.emit('join-room', { roomCode: code, name, color: selectedJoinColor });
+  const userId = SocketClient.getUserId();
+  SocketClient.emit('join-room', { roomCode: code, name, color: null, userId });
   document.getElementById('display-room-code').textContent = code;
   document.getElementById('waiting-room').style.display = 'block';
   document.querySelector('.lobby-card').style.display = 'none';
@@ -330,7 +224,6 @@ function startGame() {
   if (!isHost) return;
   SocketClient.emit('start-game', {
     roomCode,
-    slotConfig,
     theme: selectedTheme,
   });
 }
@@ -404,7 +297,12 @@ function _setupSocketHandlers() {
   });
 
   SocketClient.on('room-updated', (info) => {
-    _renderPlayersList(info.players);
+    // Determine if we are host based on server-provided hostUserId
+    const myUserId = SocketClient.getUserId();
+    isHost = (info.hostUserId === myUserId);
+    sessionStorage.setItem('ludoIsHost', isHost ? 'true' : 'false');
+
+    _renderPlayersList(info.players, info.maxPlayers);
     // Keep a color→name map in sessionStorage so game page always has real names
     const nameMap = {};
     (info.players || []).forEach(p => { nameMap[p.color] = p.name; });
@@ -435,20 +333,34 @@ function _setupSocketHandlers() {
   });
 }
 
-function _renderPlayersList(players) {
+function _renderPlayersList(players, maxCount) {
   const list = document.getElementById('players-list');
   if (!list) return;
   const myColor = sessionStorage.getItem('ludoColor');
   list.innerHTML = '';
-  players.forEach(p => {
+
+  const allowedColors = maxCount === 2 ? ['red', 'green'] :
+                        maxCount === 3 ? ['red', 'green', 'blue'] :
+                        ['red', 'green', 'blue', 'yellow'];
+
+  allowedColors.forEach(color => {
+    const p = players.find(player => player.color === color);
     const div = document.createElement('div');
-    div.className = 'player-badge';
-    const isMe = p.color === myColor;
-    div.innerHTML = `
-      <div class="badge-dot" style="background:var(--clr-${p.color});box-shadow:0 0 8px var(--clr-${p.color}-glow)"></div>
-      <div class="badge-name">${escapeHtml(p.name)}</div>
-      ${isMe ? '<span class="badge-you">YOU</span>' : ''}
-    `;
+    if (p) {
+      div.className = 'player-badge';
+      const isMe = p.color === myColor;
+      div.innerHTML = `
+        <div class="badge-dot" style="background:var(--clr-${p.color});box-shadow:0 0 8px var(--clr-${p.color}-glow)"></div>
+        <div class="badge-name">${escapeHtml(p.name)}</div>
+        ${isMe ? '<span class="badge-you">YOU</span>' : ''}
+      `;
+    } else {
+      div.className = 'player-badge waiting';
+      div.innerHTML = `
+        <div class="badge-dot waiting"></div>
+        <div class="badge-name waiting" style="color:var(--text-muted)">Waiting for player… (Bot if started)</div>
+      `;
+    }
     list.appendChild(div);
   });
 }
@@ -468,6 +380,7 @@ function escapeHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// leaveRoom function
 function leaveRoom() {
   sessionStorage.removeItem('ludoRoom');
   sessionStorage.removeItem('ludoIsHost');
@@ -482,9 +395,19 @@ function saveRecentRoom(code) {
     rooms = JSON.parse(localStorage.getItem('ludoRecentRooms') || '[]');
   } catch(e) {}
   if (!Array.isArray(rooms)) rooms = [];
-  rooms = rooms.filter(c => c !== code);
-  rooms.unshift(code);
-  if (rooms.length > 5) rooms = rooms.slice(0, 5);
+
+  // Migrate old string elements to objects
+  rooms = rooms.map(r => typeof r === 'string' ? { code: r, timestamp: Date.now() } : r);
+
+  // Filter out any duplicate code
+  rooms = rooms.filter(r => r.code !== code);
+
+  // Unshift new room with timestamp
+  rooms.unshift({ code, timestamp: Date.now() });
+
+  // Limit to 3 rooms
+  if (rooms.length > 3) rooms = rooms.slice(0, 3);
+
   localStorage.setItem('ludoRecentRooms', JSON.stringify(rooms));
 }
 
@@ -501,13 +424,15 @@ async function _renderRecentRooms() {
     container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:0.95rem;">No recent games found. Create or join a room to get started!</div>';
     return;
   }
+
+  rooms = rooms.map(r => typeof r === 'string' ? { code: r, timestamp: Date.now() } : r);
   
   container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">Loading recent games…</div>';
   
   try {
-    const fetches = rooms.map(code => 
-      fetch(`/api/history/${code}`)
-        .then(r => r.ok ? r.json() : null)
+    const fetches = rooms.map(r => 
+      fetch(`/api/history/${r.code}`)
+        .then(res => res.ok ? res.json() : null)
         .catch(() => null)
     );
     
@@ -516,7 +441,11 @@ async function _renderRecentRooms() {
     container.innerHTML = '';
     
     results.forEach((h, idx) => {
-      const code = rooms[idx];
+      const item = rooms[idx];
+      const code = item.code;
+      const timestamp = item.timestamp;
+      const timeStr = timestamp ? new Date(timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
       const div = document.createElement('div');
       div.className = 'recent-room-item';
       div.style.marginBottom = '16px';
@@ -524,7 +453,7 @@ async function _renderRecentRooms() {
       if (h) {
         div.innerHTML = `
           <div class="hist-header-recent" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding: 0 4px;">
-            <span style="font-size:0.75rem;color:var(--text-muted);font-weight:700;">ROOM: ${code}</span>
+            <span style="font-size:0.75rem;color:var(--text-muted);font-weight:700;">ROOM: ${code} <span style="font-weight:normal;opacity:0.8;margin-left:6px;">(${timeStr})</span></span>
             <span style="cursor:pointer;color:var(--gold);font-size:0.75rem;font-weight:600;" onclick="quickJoin('${code}')">🚪 Rejoin / View</span>
           </div>
           ${_renderHistoryCard(h)}
@@ -533,7 +462,7 @@ async function _renderRecentRooms() {
         div.innerHTML = `
           <div class="history-card" style="padding:14px;background:rgba(0,0,0,0.25);">
             <div class="hist-header" style="margin-bottom:0;">
-              <span class="hist-title">ROOM: ${code}</span>
+              <span class="hist-title">ROOM: ${code} <span style="font-size:0.75rem;font-weight:normal;color:var(--text-muted);margin-left:6px;">(${timeStr})</span></span>
               <span class="hist-meta" style="cursor:pointer;color:var(--gold);font-weight:600;" onclick="quickJoin('${code}')">🚪 Join Room</span>
             </div>
           </div>

@@ -484,3 +484,53 @@
   letter-spacing: 1px;
 }
 
+/* ---- Player Count Selector ---- */
+.player-count-selector {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+}
+.player-count-selector .count-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  padding: 11px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+}
+.player-count-selector .count-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+.player-count-selector .count-btn.selected {
+  background: var(--gold-grad);
+  border-color: var(--gold);
+  color: #0b0b1a;
+  box-shadow: 0 0 14px var(--gold-glow);
+  transform: translateY(0);
+}
+.player-count-selector .count-btn:active {
+  transform: scale(0.97);
+}
+
+/* ---- Waiting Room Badge Extensions ---- */
+.player-badge.waiting {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+.player-badge.waiting .badge-dot.waiting {
+  background: #2a2a3e !important;
+  box-shadow: none !important;
+}
+
+

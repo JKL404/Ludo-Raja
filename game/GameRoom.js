@@ -24,6 +24,9 @@ class GameRoom {
     this.status = 'waiting'; // 'waiting' | 'playing' | 'finished'
     this.hostSocketId = null;
     this.hostColor = null; // Stable color of the host — survives socket reconnects
+    this.hostUserId = null;
+    this.maxPlayers = 4;
+    this.userIdMap = {}; // userId -> color
     this.rankings = []; // final rankings
   }
 
@@ -38,17 +41,31 @@ class GameRoom {
   }
 
   // Add a human player to a slot
-  async joinPlayer(socketId, name, color) {
+  async joinPlayer(socketId, name, color, userId) {
     const oldSocketId = this.colorMap[color];
     if (oldSocketId && this.players[oldSocketId]) {
       delete this.players[oldSocketId];
     }
-    this.players[socketId] = { name, color, isBot: false };
+
+    // Clean up any other socket mappings for this userId to avoid duplicates
+    for (const [sId, p] of Object.entries(this.players)) {
+      if (p.userId === userId && sId !== socketId) {
+        delete this.players[sId];
+      }
+    }
+
+    this.players[socketId] = { name, color, userId, isBot: false };
     this.colorMap[color] = socketId;
-    // Update hostSocketId when: first player, same socket replaced, host's socket
-    // disconnected (no longer in players), or this color IS the host's color
-    const hostGone = this.hostSocketId && !this.players[this.hostSocketId];
-    if (!this.hostSocketId || this.hostSocketId === oldSocketId || hostGone) {
+
+    if (!this.userIdMap) this.userIdMap = {};
+    this.userIdMap[userId] = color;
+
+    // Stable host tracking using hostUserId
+    if (!this.hostUserId) {
+      this.hostUserId = userId;
+      this.hostSocketId = socketId;
+      this.hostColor = color;
+    } else if (this.hostUserId === userId) {
       this.hostSocketId = socketId;
       this.hostColor = color;
     }
@@ -248,7 +265,31 @@ class GameRoom {
       theme: this.theme,
       slotConfig: this.slotConfig,
       players: Object.values(this.players).map(p => ({ name: p.name, color: p.color })),
+      maxPlayers: this.maxPlayers || 4,
+      hostUserId: this.hostUserId || null,
     };
+  }
+
+  getAllowedColors() {
+    if (this.maxPlayers === 2) {
+      return ['red', 'green'];
+    } else if (this.maxPlayers === 3) {
+      return ['red', 'green', 'blue'];
+    } else {
+      return ['red', 'green', 'blue', 'yellow'];
+    }
+  }
+
+  buildStartSlotConfig() {
+    const allowedColors = this.getAllowedColors();
+    return allowedColors.map(color => {
+      const p = Object.values(this.players).find(player => player.color === color);
+      if (p) {
+        return { color, isBot: false, name: p.name };
+      } else {
+        return { color, isBot: true, name: `Bot ${color.toUpperCase()} 🤖` };
+      }
+    });
   }
 
   // ---- Timer management ----
@@ -468,6 +509,9 @@ class GameRoom {
       status: this.status,
       hostSocketId: this.hostSocketId,
       hostColor: this.hostColor,
+      hostUserId: this.hostUserId,
+      maxPlayers: this.maxPlayers,
+      userIdMap: this.userIdMap,
       rankings: this.rankings,
     };
   }
@@ -484,6 +528,9 @@ class GameRoom {
     room.status = data.status || 'waiting';
     room.hostSocketId = data.hostSocketId;
     room.hostColor = data.hostColor || null;
+    room.hostUserId = data.hostUserId || null;
+    room.maxPlayers = data.maxPlayers || 4;
+    room.userIdMap = data.userIdMap || {};
     room.rankings = data.rankings || [];
     room.timerStart = data.timerStart || null;
     room.startedAt = data.startedAt || null;

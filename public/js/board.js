@@ -237,6 +237,31 @@ const BoardRenderer = (() => {
     draw();
     if (options.onComplete) options.onComplete();
   }
+  function _getViewRotationAngle() {
+    if (!myColor) return 0;
+    switch (myColor) {
+      case 'red': return 0;
+      case 'blue': return -Math.PI / 2;
+      case 'green': return Math.PI;
+      case 'yellow': return Math.PI / 2;
+      default: return 0;
+    }
+  }
+
+  function _unrotatePoint(x, y, angle) {
+    if (angle === 0) return { x, y };
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const dx = x - cx;
+    const dy = y - cy;
+    const cos = Math.cos(-angle);
+    const sin = Math.sin(-angle);
+    return {
+      x: cx + dx * cos - dy * sin,
+      y: cy + dx * sin + dy * cos
+    };
+  }
+
   function setMyColor(c) { myColor = c; }
 
   // ---- Main draw ----
@@ -244,8 +269,21 @@ const BoardRenderer = (() => {
     if (!ctx) return;
     cellSize = canvas.width / GRID;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const angle = _getViewRotationAngle();
+    if (angle !== 0) {
+      ctx.translate(centerX, centerY);
+      ctx.rotate(angle);
+      ctx.translate(-centerX, -centerY);
+    }
+
     _drawBoard();
     if (gameState) _drawTokens();
+
+    ctx.restore();
   }
 
   // ---- Board drawing ----
@@ -656,6 +694,11 @@ const BoardRenderer = (() => {
     ctx.translate(x, y);
     ctx.scale(scale, scale);
 
+    const angle = _getViewRotationAngle();
+    if (angle !== 0) {
+      ctx.rotate(-angle);
+    }
+
     // Outer ring
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -745,8 +788,10 @@ const BoardRenderer = (() => {
     if (!movableIds.length) return;
 
     const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const my = (e.clientY - rect.top)  * (canvas.height / rect.height);
+    const physX = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const physY = (e.clientY - rect.top)  * (canvas.height / rect.height);
+    const angle = _getViewRotationAngle();
+    const { x: mx, y: my } = _unrotatePoint(physX, physY, angle);
     const c  = cellSize;
 
     _updateTokenLayouts();
@@ -767,8 +812,10 @@ const BoardRenderer = (() => {
     if (isAnimating) return;
     if (!gameState || gameState.phase !== 'moving' || !myColor) return;
     const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const my = (e.clientY - rect.top)  * (canvas.height / rect.height);
+    const physX = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const physY = (e.clientY - rect.top)  * (canvas.height / rect.height);
+    const angle = _getViewRotationAngle();
+    const { x: mx, y: my } = _unrotatePoint(physX, physY, angle);
     const c  = cellSize;
 
     _updateTokenLayouts();
