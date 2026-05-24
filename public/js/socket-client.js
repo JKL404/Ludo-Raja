@@ -47,10 +47,15 @@ const SocketClient = (() => {
   function getSocketId() { return socket?.id; }
 
   function getUserId() {
-    let uid = sessionStorage.getItem('ludoUserId');
+    let uid = sessionStorage.getItem('ludoUserId') || localStorage.getItem('ludoUserId');
     if (!uid) {
       uid = 'usr_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('ludoUserId', uid);
       sessionStorage.setItem('ludoUserId', uid);
+    } else {
+      // Keep them in sync
+      if (!sessionStorage.getItem('ludoUserId')) sessionStorage.setItem('ludoUserId', uid);
+      if (!localStorage.getItem('ludoUserId')) localStorage.setItem('ludoUserId', uid);
     }
     return uid;
   }

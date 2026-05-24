@@ -315,6 +315,64 @@
 .pc-badge.bot { background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid #6366f1; }
 .pc-badge.finished { background: rgba(245,200,66,0.2); color: var(--gold); border: 1px solid var(--gold); }
 
+/* ---- GO Speech Bubble Turn Indicator ---- */
+.pc-go-bubble {
+  display: none;
+  position: relative;
+  font-weight: 800;
+  font-size: 0.72rem;
+  padding: 2px 7px;
+  border-radius: 6px;
+  margin-left: 8px;
+  font-family: 'Rajdhani', sans-serif;
+  text-transform: uppercase;
+  animation: go-bubble-pulse 0.7s ease-in-out infinite alternate;
+  letter-spacing: 0.5px;
+}
+
+.player-card.active-turn .pc-go-bubble {
+  display: inline-block;
+}
+
+@keyframes go-bubble-pulse {
+  from { transform: scale(0.96); }
+  to { transform: scale(1.08); }
+}
+
+/* Speech bubble tail pointer */
+.pc-go-bubble::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: -4px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+[data-theme="galaxy"] .pc-go-bubble {
+  background: #ffffff;
+  color: #0d0d2b;
+  border: 1.5px solid var(--active-color);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 0 5px var(--active-glow);
+}
+[data-theme="galaxy"] .pc-go-bubble::after {
+  border-width: 4px 4px 4px 0;
+  border-color: transparent #ffffff transparent transparent;
+}
+
+[data-theme="classic"] .pc-go-bubble {
+  background: #ffd700;
+  color: #1a0e06;
+  border: 1.5px solid #b8860b;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+[data-theme="classic"] .pc-go-bubble::after {
+  border-width: 4px 4px 4px 0;
+  border-color: transparent #ffd700 transparent transparent;
+}
+
 .pc-tokens {
   display: flex;
   gap: 4px;

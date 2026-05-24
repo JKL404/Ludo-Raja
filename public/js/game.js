@@ -30,7 +30,7 @@ const GameController = (() => {
 
     // Restore session
     myColor     = sessionStorage.getItem('ludoColor')       || 'red';
-    myName      = sessionStorage.getItem('ludoName')        || 'Player';
+    myName      = sessionStorage.getItem('ludoName')        || localStorage.getItem('ludoName') || 'Player';
     roomCode    = sessionStorage.getItem('ludoRoom')        || '';
     theme       = sessionStorage.getItem('ludoTheme')       || 'galaxy';
     slotConfig  = JSON.parse(sessionStorage.getItem('ludoSlots')       || '[]');
@@ -375,6 +375,7 @@ const GameController = (() => {
         <div class="pc-dot" style="background:${TOKEN_COLORS[color]};box-shadow:0 0 8px ${TOKEN_COLORS[color]}66"></div>
         <div class="pc-name">${escapeHtml(name)}</div>
         <span class="pc-badge ${slot?.isBot ? 'bot' : (color === myColor ? 'you' : '')}">${slot?.isBot ? '🤖' : (color === myColor ? 'YOU' : '')}</span>
+        <div class="pc-go-bubble">GO</div>
       </div>
       <div class="pc-tokens">
         ${[0,1,2,3].map(i => `<div class="pc-token-pip" style="background:${TOKEN_COLORS[color]}55;border-color:${TOKEN_COLORS[color]}88"></div>`).join('')}

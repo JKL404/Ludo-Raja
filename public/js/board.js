@@ -31,29 +31,29 @@ const BoardRenderer = (() => {
   ];
 
   const HOME_COLUMNS = {
-    red:    [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],      // col=7, going UP toward center
-    blue:   [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],          // row=7, going RIGHT toward center
+    blue:   [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],      // col=7, going UP toward center
+    red:    [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],          // row=7, going RIGHT toward center
     green:  [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],          // col=7, going DOWN toward center
     yellow: [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]],      // row=7, going LEFT toward center
   };
 
   const YARD_POSITIONS = {
-    red:    [[1.5, 10.5], [3.5, 10.5], [1.5, 12.5], [3.5, 12.5]],
-    blue:   [[1.5, 1.5],  [3.5, 1.5],  [1.5, 3.5],  [3.5, 3.5]],
+    blue:   [[1.5, 10.5], [3.5, 10.5], [1.5, 12.5], [3.5, 12.5]],
+    red:    [[1.5, 1.5],  [3.5, 1.5],  [1.5, 3.5],  [3.5, 3.5]],
     green:  [[10.5, 1.5], [12.5, 1.5], [10.5, 3.5], [12.5, 3.5]],
     yellow: [[10.5, 10.5],[12.5, 10.5],[10.5, 12.5],[12.5, 12.5]],
   };
 
 
-  const COLOR_ENTRY = { red: 0, blue: 13, green: 26, yellow: 39 };
+  const COLOR_ENTRY = { blue: 0, red: 13, green: 26, yellow: 39 };
 
   // Star (safe) positions
   const SAFE_SET = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
 
   // Home zone bounds [colMin,colMax,rowMin,rowMax]
   const HOME_ZONES = {
-    red:    [0,5,9,14],
-    blue:   [0,5,0,5],
+    blue:   [0,5,9,14],
+    red:    [0,5,0,5],
     green:  [9,14,0,5],
     yellow: [9,14,9,14],
   };
@@ -91,7 +91,7 @@ const BoardRenderer = (() => {
   let myColor = null;
   let movableIds = [];
   let hoveredToken = null;
-  let tokenAnimations = {}; // color+id → { x, y, targetX, targetY }
+  let animatingToken = null; // { color, id, fromX, fromY, toX, toY, startTime, duration }
   let displaySteps = {};
   let isAnimating = false;
 
@@ -105,6 +105,30 @@ const BoardRenderer = (() => {
     }
   }
 
+  function _getScreenCoords(boardX, boardY) {
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const angle = _getViewRotationAngle();
+    
+    let rx = boardX;
+    let ry = boardY;
+    if (angle !== 0) {
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const dx = boardX - cx;
+      const dy = boardY - cy;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      rx = cx + dx * cos - dy * sin;
+      ry = cy + dx * sin + dy * cos;
+    }
+    
+    return {
+      x: rect.left + rx * (rect.width / canvas.width),
+      y: rect.top + ry * (rect.height / canvas.height)
+    };
+  }
+
   function _animateTokenMove(color, id, from, to, captured, reachedHome, onComplete) {
     isAnimating = true;
     let current = from;
@@ -112,17 +136,52 @@ const BoardRenderer = (() => {
     // Play initial sound if entering board from yard
     if (from === -1 && to >= 0) {
       if (window.SoundEngine) window.SoundEngine.play.enterBoard();
+      // Entry burst
+      setTimeout(() => {
+        const cell = _getTokenCell(color, 0);
+        if (cell) {
+          const c = cellSize;
+          const pos = _getScreenCoords(cell[0] * c + c/2, cell[1] * c + c/2);
+          if (window.ParticleSystem) {
+            window.ParticleSystem.spawnBurst(pos.x, pos.y, color, 'normal');
+          }
+        }
+      }, 50);
     }
 
     function nextStep() {
       if (current >= to) {
         _syncDisplaySteps();
         isAnimating = false;
+        animatingToken = null;
         
+        let finalCell = _getTokenCell(color, to);
+        let screenPos = null;
+        if (finalCell) {
+          const c = cellSize;
+          screenPos = _getScreenCoords(finalCell[0] * c + c/2, finalCell[1] * c + c/2);
+        } else if (to === -1) {
+          const yard = YARD_POSITIONS[color];
+          if (yard && yard[id]) {
+            const c = cellSize;
+            screenPos = _getScreenCoords(yard[id][0] * c + c/2, yard[id][1] * c + c/2);
+          }
+        }
+
         if (captured) {
           if (window.SoundEngine) window.SoundEngine.play.capture();
+          if (screenPos && window.ParticleSystem) {
+            window.ParticleSystem.spawnBurst(screenPos.x, screenPos.y, color, 'high');
+          }
         } else if (reachedHome) {
           if (window.SoundEngine) window.SoundEngine.play.enterHome();
+          if (screenPos && window.ParticleSystem) {
+            window.ParticleSystem.spawnBurst(screenPos.x, screenPos.y, color, 'high');
+          }
+        } else {
+          if (screenPos && window.ParticleSystem) {
+            window.ParticleSystem.spawnBurst(screenPos.x, screenPos.y, color, 'normal');
+          }
         }
         
         draw();
@@ -130,8 +189,34 @@ const BoardRenderer = (() => {
         return;
       }
       
+      const stepDuration = 180;
+      const fromStep = current;
       current++;
-      displaySteps[`${color}_${id}`] = current;
+      const toStep = current;
+      displaySteps[`${color}_${id}`] = toStep;
+      
+      const fromCoords = _getCellCenterCoords(color, id, fromStep);
+      const toCoords = _getCellCenterCoords(color, id, toStep);
+      
+      if (fromCoords && toCoords) {
+        animatingToken = {
+          color,
+          id,
+          fromX: fromCoords.x,
+          fromY: fromCoords.y,
+          toX: toCoords.x,
+          toY: toCoords.y,
+          startTime: Date.now(),
+          duration: stepDuration
+        };
+      } else {
+        animatingToken = null;
+      }
+
+      if (toCoords && window.ParticleSystem) {
+        const screenPos = _getScreenCoords(toCoords.x, toCoords.y);
+        window.ParticleSystem.spawnTrail(screenPos.x, screenPos.y, TOKEN_COLORS[color] || '#ffffff');
+      }
       
       // Play tick sound per step
       if (!(from === -1 && current === 0)) {
@@ -139,7 +224,7 @@ const BoardRenderer = (() => {
       }
       
       draw();
-      setTimeout(nextStep, 180);
+      setTimeout(nextStep, stepDuration);
     }
     
     nextStep();
@@ -233,6 +318,7 @@ const BoardRenderer = (() => {
       }
     }
 
+    animatingToken = null;
     _syncDisplaySteps();
     draw();
     if (options.onComplete) options.onComplete();
@@ -240,8 +326,8 @@ const BoardRenderer = (() => {
   function _getViewRotationAngle() {
     if (!myColor) return 0;
     switch (myColor) {
-      case 'red': return 0;
-      case 'blue': return -Math.PI / 2;
+      case 'blue': return 0;
+      case 'red': return -Math.PI / 2;
       case 'green': return Math.PI;
       case 'yellow': return Math.PI / 2;
       default: return 0;
@@ -307,23 +393,47 @@ const BoardRenderer = (() => {
       const w = (cMax - cMin + 1) * c, h = (rMax - rMin + 1) * c;
 
       ctx.save();
+      const isCurrentTurn = gameState && gameState.currentColor === color && gameState.phase !== 'finished';
       if (theme === 'classic') {
         // Crisp, solid square for classic yard
         ctx.fillStyle = TOKEN_COLORS[color];
         ctx.fillRect(x, y, w, h);
-        ctx.strokeStyle = '#5d4037';
-        ctx.lineWidth = 3;
+        
+        if (isCurrentTurn) {
+          const pulse = Math.abs(Math.sin(Date.now() / 200));
+          ctx.strokeStyle = '#ffd700'; // gold active border
+          ctx.lineWidth = 4 + pulse * 2.5;
+          ctx.shadowColor = '#ffd700';
+          ctx.shadowBlur = 8 + pulse * 10;
+        } else {
+          ctx.strokeStyle = '#5d4037';
+          ctx.lineWidth = 3;
+        }
         ctx.strokeRect(x, y, w, h);
       } else {
         // Frosted glowing panel for galaxy yard
         const grad = ctx.createLinearGradient(x, y, x + w, y + h);
-        grad.addColorStop(0, 'rgba(' + _hexToRgb(TOKEN_COLORS[color]) + ', 0.18)');
-        grad.addColorStop(1, 'rgba(' + _hexToRgb(TOKEN_COLORS[color]) + ', 0.06)');
+        if (isCurrentTurn) {
+          grad.addColorStop(0, 'rgba(' + _hexToRgb(TOKEN_COLORS[color]) + ', 0.32)');
+          grad.addColorStop(1, 'rgba(' + _hexToRgb(TOKEN_COLORS[color]) + ', 0.16)');
+        } else {
+          grad.addColorStop(0, 'rgba(' + _hexToRgb(TOKEN_COLORS[color]) + ', 0.18)');
+          grad.addColorStop(1, 'rgba(' + _hexToRgb(TOKEN_COLORS[color]) + ', 0.06)');
+        }
         ctx.fillStyle = grad;
         ctx.strokeStyle = TOKEN_COLORS[color];
-        ctx.lineWidth = 2.5;
-        ctx.shadowColor = TOKEN_COLORS[color];
-        ctx.shadowBlur = 15;
+        
+        if (isCurrentTurn) {
+          const pulse = Math.abs(Math.sin(Date.now() / 150));
+          ctx.lineWidth = 3.5 + pulse * 2.0;
+          ctx.shadowColor = TOKEN_COLORS[color];
+          ctx.shadowBlur = 20 + pulse * 20;
+        } else {
+          ctx.lineWidth = 2.5;
+          ctx.shadowColor = TOKEN_COLORS[color];
+          ctx.shadowBlur = 15;
+        }
+        
         ctx.beginPath();
         ctx.roundRect(x + 6, y + 6, w - 12, h - 12, 16);
         ctx.fill();
@@ -662,32 +772,65 @@ const BoardRenderer = (() => {
         const layout = tokenLayoutMap[`${color}_${i}`];
         if (!layout) return;
 
+        let drawX = layout.x;
+        let drawY = layout.y;
+        let drawScale = layout.scale;
+
+        if (animatingToken && animatingToken.color === color && animatingToken.id === i) {
+          const elapsed = Date.now() - animatingToken.startTime;
+          const progress = Math.min(1.0, elapsed / animatingToken.duration);
+          const bounce = Math.sin(progress * Math.PI) * cellSize * 0.45;
+          
+          drawX = animatingToken.fromX + (animatingToken.toX - animatingToken.fromX) * progress;
+          drawY = animatingToken.fromY + (animatingToken.toY - animatingToken.fromY) * progress - bounce;
+          drawScale = 1.05;
+        }
+
         const isMovable = myColor === color && movableIds.includes(i) && gameState.phase === 'moving';
         const isHovered = hoveredToken && hoveredToken.color === color && hoveredToken.id === i;
 
-        _drawToken(layout.x, layout.y, color, i, isMovable, isHovered, cellSize, layout.scale);
+        _drawToken(drawX, drawY, color, i, isMovable, isHovered, cellSize, drawScale);
       });
     }
   }
 
   function _drawToken(x, y, color, id, isMovable, isHovered, c, tokenScale = 1.0) {
-    const r = c * 0.3;
+    const r = c * 0.28;
 
     ctx.save();
 
-    // 3D Drop Shadow / Active Glowing Pulse
+    // 1. Aura / Active pulsing glow ring at the base of the cell
     if (isMovable) {
-      const pulseGlow = 12 + Math.sin(Date.now() / 150) * 8;
-      ctx.shadowColor = TOKEN_COLORS[color];
-      ctx.shadowBlur  = pulseGlow;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-    } else {
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-      ctx.shadowBlur = 6;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 3;
+      ctx.save();
+      // Ensure no global shadows affect the custom multi-layered glow
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = 'transparent';
+      
+      const auraScale = 1.0 + Math.sin(Date.now() / 150) * 0.12;
+      const baseColor = TOKEN_COLORS[color] || '#ffffff';
+      
+      // Outer soft ring
+      ctx.strokeStyle = `rgba(${_hexToRgb(baseColor)}, 0.45)`;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(0, r * 0.6, r * 1.15 * auraScale, r * 0.35 * auraScale, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Inner crisp ring
+      ctx.strokeStyle = baseColor;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(0, r * 0.6, r * 0.9 * auraScale, r * 0.27 * auraScale, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      ctx.restore();
     }
+
+    // 2. Base Contact Drop Shadow
+    ctx.fillStyle = 'rgba(5, 5, 18, 0.42)';
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.72, r * 0.88, r * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
 
     // Pulsing scale for movable/hovered, scaled by tokenScale
     const scale = (isMovable && isHovered ? 1.25 : isMovable ? 1.1 : 1) * tokenScale;
@@ -699,73 +842,141 @@ const BoardRenderer = (() => {
       ctx.rotate(-angle);
     }
 
-    // Outer ring
+    // --- PAWN RENDERING ---
+
+    // 1. Base Stand (Beveled edge)
+    const rimColor = theme === 'classic' ? '#3e2723' : `rgba(${_hexToRgb(TOKEN_BORDER[color])}, 0.85)`;
+    ctx.fillStyle = rimColor;
     ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.ellipse(0, r * 0.6, r * 0.78, r * 0.24, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    const baseGrad = ctx.createLinearGradient(-r * 0.75, r * 0.6, r * 0.75, r * 0.6);
     if (theme === 'classic') {
-      ctx.fillStyle = TOKEN_COLORS[color]; // Solid color base for classic theme
-      ctx.fill();
-      ctx.strokeStyle = '#3e2723'; // Dark brown walnut rim
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+      baseGrad.addColorStop(0, '#5d4037');
+      baseGrad.addColorStop(0.3, TOKEN_COLORS[color]);
+      baseGrad.addColorStop(0.7, TOKEN_COLORS[color]);
+      baseGrad.addColorStop(1, '#3e2723');
     } else {
-      ctx.fillStyle = TOKEN_BORDER[color];
-      ctx.fill();
+      baseGrad.addColorStop(0, TOKEN_BORDER[color]);
+      baseGrad.addColorStop(0.4, TOKEN_COLORS[color]);
+      baseGrad.addColorStop(0.8, '#0b0b1e');
     }
-
-    // Reset shadow for inner layers
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Inner circle
+    ctx.fillStyle = baseGrad;
     ctx.beginPath();
-    ctx.arc(0, 0, r * 0.75, 0, Math.PI * 2);
-    const grad = ctx.createRadialGradient(-r*0.15, -r*0.15, 0, 0, 0, r*0.75);
-    if (theme === 'classic') {
-      grad.addColorStop(0, TOKEN_CENTER_CLASSIC[color]);
-      grad.addColorStop(1, TOKEN_COLORS[color]);
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      // Subtle inner accent border for 3D tactile feel
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-      ctx.lineWidth = 1.0;
-      ctx.stroke();
-    } else {
-      grad.addColorStop(0, TOKEN_BORDER[color]);
-      grad.addColorStop(1, TOKEN_COLORS[color]);
-      ctx.fillStyle = grad;
-      ctx.fill();
-    }
-
-    // Specular glossy reflection highlight (creates a premium 3D marble look)
-    ctx.beginPath();
-    ctx.arc(-r * 0.22, -r * 0.22, r * 0.25, 0, Math.PI * 2);
-    const specGrad = ctx.createRadialGradient(-r * 0.22, -r * 0.22, 0, -r * 0.22, -r * 0.22, r * 0.25);
-    specGrad.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
-    specGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = specGrad;
+    ctx.ellipse(0, r * 0.6, r * 0.74, r * 0.21, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Token number
-    ctx.font = `bold ${r * 0.8}px Outfit, sans-serif`;
+    // 2. Body of Pawn
+    const bodyColor = theme === 'classic' ? '#3e2723' : `rgba(${_hexToRgb(TOKEN_BORDER[color])}, 0.65)`;
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.58, r * 0.5);
+    ctx.quadraticCurveTo(-r * 0.29, r * 0.15, -r * 0.19, -r * 0.05);
+    ctx.lineTo(r * 0.19, -r * 0.05);
+    ctx.quadraticCurveTo(r * 0.29, r * 0.15, r * 0.58, r * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    
+    const bodyGrad = ctx.createLinearGradient(-r * 0.55, 0, r * 0.55, 0);
+    if (theme === 'classic') {
+      bodyGrad.addColorStop(0, TOKEN_CENTER_CLASSIC[color]);
+      bodyGrad.addColorStop(0.3, TOKEN_COLORS[color]);
+      bodyGrad.addColorStop(1, '#3e2723');
+    } else {
+      bodyGrad.addColorStop(0, TOKEN_BORDER[color]);
+      bodyGrad.addColorStop(0.3, TOKEN_COLORS[color]);
+      bodyGrad.addColorStop(0.8, '#0b0b1e');
+    }
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.53, r * 0.5);
+    ctx.quadraticCurveTo(-r * 0.27, r * 0.15, -r * 0.17, -r * 0.05);
+    ctx.lineTo(r * 0.17, -r * 0.05);
+    ctx.quadraticCurveTo(r * 0.27, r * 0.15, r * 0.53, r * 0.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // 3. Neck Collar Ring
+    ctx.fillStyle = theme === 'classic' ? '#3e2723' : `rgba(${_hexToRgb(TOKEN_BORDER[color])}, 0.85)`;
+    ctx.beginPath();
+    ctx.ellipse(0, -r * 0.05, r * 0.24, r * 0.07, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const collarGrad = ctx.createLinearGradient(-r * 0.22, 0, r * 0.22, 0);
+    if (theme === 'classic') {
+      collarGrad.addColorStop(0, '#fff3a8');
+      collarGrad.addColorStop(0.4, '#ffd700'); // Gold ring
+      collarGrad.addColorStop(1, '#9e7815');
+    } else {
+      collarGrad.addColorStop(0, '#ffffff');
+      collarGrad.addColorStop(0.5, TOKEN_BORDER[color]);
+      collarGrad.addColorStop(1, '#0b0b1e');
+    }
+    ctx.fillStyle = collarGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, -r * 0.05, r * 0.21, r * 0.05, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 4. Head Sphere
+    const headRadius = r * 0.44;
+    const headY = -r * 0.48;
+    
+    ctx.fillStyle = theme === 'classic' ? '#3e2723' : `rgba(${_hexToRgb(TOKEN_BORDER[color])}, 0.85)`;
+    ctx.beginPath();
+    ctx.arc(0, headY, headRadius + 0.8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    const headGrad = ctx.createRadialGradient(-headRadius * 0.28, headY - headRadius * 0.28, 0, 0, headY, headRadius);
+    if (theme === 'classic') {
+      headGrad.addColorStop(0, '#ffffff'); // shiny spec
+      headGrad.addColorStop(0.2, TOKEN_CENTER_CLASSIC[color]);
+      headGrad.addColorStop(0.85, TOKEN_COLORS[color]);
+      headGrad.addColorStop(1, '#3e2723');
+    } else {
+      headGrad.addColorStop(0, '#ffffff'); // glassy highlight
+      headGrad.addColorStop(0.2, TOKEN_BORDER[color]);
+      headGrad.addColorStop(0.8, TOKEN_COLORS[color]);
+      headGrad.addColorStop(1, '#0b0b1e');
+    }
+    ctx.fillStyle = headGrad;
+    ctx.beginPath();
+    ctx.arc(0, headY, headRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 5. Specular Gloss Overlay (Glass finish)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
+    ctx.beginPath();
+    ctx.ellipse(-headRadius * 0.22, headY - headRadius * 0.22, headRadius * 0.35, headRadius * 0.18, -Math.PI / 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 6. Token Number Text
+    ctx.font = `bold ${headRadius * 1.05}px Outfit, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-    ctx.lineWidth = 2.5;
-    ctx.strokeText(id + 1, 0, r * 0.08);
+    
+    // Soft shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.fillText(id + 1, 0, headY + 1);
+    
+    // Main text
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(id + 1, 0, r * 0.08);
+    ctx.fillText(id + 1, 0, headY);
 
-    // Movable indicator (bouncing dot above)
+    // 7. Active diamond bounce floating indicator
     if (isMovable) {
-      const bounce = Math.sin(Date.now() / 200) * 3;
+      const bounce = Math.sin(Date.now() / 150) * 4;
+      const dSize = 4.5;
+      const dy = headY - headRadius - 10 + bounce;
+      
+      ctx.save();
+      ctx.translate(0, dy);
+      ctx.rotate(Math.PI / 4); // diamond
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 12;
       ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(0, -r - 6 + bounce, 3.5, 0, Math.PI*2);
-      ctx.fill();
+      ctx.fillRect(-dSize, -dSize, dSize * 2, dSize * 2);
+      ctx.restore();
     }
 
     ctx.restore();
@@ -779,6 +990,21 @@ const BoardRenderer = (() => {
     }
     const entry = COLOR_ENTRY[color];
     return MAIN_PATH[(entry + steps) % MAIN_PATH.length];
+  }
+
+  function _getCellCenterCoords(color, id, steps) {
+    const c = cellSize;
+    if (steps === -1) {
+      const yard = YARD_POSITIONS[color];
+      if (yard && yard[id]) {
+        return { x: yard[id][0] * c + c/2, y: yard[id][1] * c + c/2 };
+      }
+    }
+    const cell = _getTokenCell(color, steps);
+    if (cell) {
+      return { x: cell[0] * c + c/2, y: cell[1] * c + c/2 };
+    }
+    return null;
   }
 
   // ---- Click/hover handling ----
@@ -843,7 +1069,7 @@ const BoardRenderer = (() => {
   let _animFrame = null;
   function startAnimLoop() {
     function loop() {
-      if (movableIds.length > 0 && gameState?.phase === 'moving') draw();
+      if (gameState && gameState.phase !== 'finished') draw();
       _animFrame = requestAnimationFrame(loop);
     }
     if (!_animFrame) loop();

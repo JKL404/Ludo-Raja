@@ -163,11 +163,17 @@ io.on('connection', (socket) => {
     }
 
     // Determine player color based on userId or next free slot
+    const allowedColors = room.getAllowedColors();
     let assignedColor = color;
+    if (assignedColor && !allowedColors.includes(assignedColor)) {
+      assignedColor = null;
+    }
+
     if (room.userIdMap && room.userIdMap[userId]) {
       assignedColor = room.userIdMap[userId];
-    } else {
-      const allowedColors = room.getAllowedColors();
+    }
+
+    if (!assignedColor || !allowedColors.includes(assignedColor)) {
       const takenColors = Object.values(room.players).map(p => p.color);
       const freeColor = allowedColors.find(c => !takenColors.includes(c));
       if (!freeColor) {

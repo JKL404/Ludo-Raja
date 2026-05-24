@@ -7,6 +7,13 @@ const { COLORS } = require('./constants');
 
 const TURN_TIMER_MS = 30000; // 30 seconds
 
+const DIAGONAL_MAP = {
+  blue: 'green',
+  green: 'blue',
+  red: 'yellow',
+  yellow: 'red'
+};
+
 class GameRoom {
   constructor(roomCode, io, roomStore = null) {
     this.roomCode = roomCode;
@@ -267,16 +274,32 @@ class GameRoom {
       players: Object.values(this.players).map(p => ({ name: p.name, color: p.color })),
       maxPlayers: this.maxPlayers || 4,
       hostUserId: this.hostUserId || null,
+      hostColor: this.hostColor || null,
     };
   }
 
   getAllowedColors() {
+    const baseColors = ['blue', 'red', 'green', 'yellow'];
+    const host = this.hostColor || 'blue';
+    const idx = baseColors.indexOf(host);
+    
+    // Clockwise order starting from host
+    const clockwise = [
+      baseColors[idx],
+      baseColors[(idx + 1) % 4],
+      baseColors[(idx + 2) % 4],
+      baseColors[(idx + 3) % 4]
+    ];
+
     if (this.maxPlayers === 2) {
-      return ['red', 'green'];
+      // 2 players: host (LB) and opposite (RU)
+      return [clockwise[0], clockwise[2]];
     } else if (this.maxPlayers === 3) {
-      return ['red', 'green', 'blue'];
+      // 3 players: host (LB), LU, RU
+      return [clockwise[0], clockwise[1], clockwise[2]];
     } else {
-      return ['red', 'green', 'blue', 'yellow'];
+      // 4 players: host (LB), LU, RU, RD
+      return clockwise;
     }
   }
 

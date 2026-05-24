@@ -7,8 +7,8 @@ let selectedTheme = 'galaxy';
 let roomCode = null;
 let isHost = false;
 let maxPlayers = 4;
-const ALL_COLORS = ['red','blue','green','yellow'];
-const DIAGONAL_MAP = { red: 'green', green: 'red', blue: 'yellow', yellow: 'blue' };
+const ALL_COLORS = ['blue','red','green','yellow'];
+const DIAGONAL_MAP = { blue: 'green', green: 'blue', red: 'yellow', yellow: 'red' };
 const COLOR_EMOJI = { red:'🔴', blue:'🔵', green:'🟢', yellow:'🟡' };
 
 // ---- Init ----
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
   _generateStars();
 
   // Default pre-fill name
-  const saved = sessionStorage.getItem('ludoName');
+  const saved = sessionStorage.getItem('ludoName') || localStorage.getItem('ludoName');
   if (saved) {
     document.getElementById('create-name').value = saved;
     document.getElementById('join-name').value   = saved;
@@ -178,6 +178,8 @@ async function createGame() {
   if (!name) { showToast('Please enter your name', 'error'); return; }
 
   sessionStorage.setItem('ludoName', name);
+  localStorage.setItem('ludoName', name);
+  sessionStorage.removeItem('ludoColor');
 
   const res  = await fetch('/api/rooms', {
     method: 'POST',
@@ -209,6 +211,8 @@ function joinGame() {
   if (code.length !== 6) { showToast('Enter a valid 6-letter room code', 'error'); return; }
 
   sessionStorage.setItem('ludoName', name);
+  localStorage.setItem('ludoName', name);
+  sessionStorage.removeItem('ludoColor');
   roomCode = code;
   saveRecentRoom(code);
 
@@ -302,7 +306,7 @@ function _setupSocketHandlers() {
     isHost = (info.hostUserId === myUserId);
     sessionStorage.setItem('ludoIsHost', isHost ? 'true' : 'false');
 
-    _renderPlayersList(info.players, info.maxPlayers);
+    _renderPlayersList(info.players, info.maxPlayers, info.hostColor);
     // Keep a color→name map in sessionStorage so game page always has real names
     const nameMap = {};
     (info.players || []).forEach(p => { nameMap[p.color] = p.name; });
@@ -333,15 +337,26 @@ function _setupSocketHandlers() {
   });
 }
 
-function _renderPlayersList(players, maxCount) {
+function _renderPlayersList(players, maxCount, hostColor) {
   const list = document.getElementById('players-list');
   if (!list) return;
   const myColor = sessionStorage.getItem('ludoColor');
   list.innerHTML = '';
 
-  const allowedColors = maxCount === 2 ? ['red', 'green'] :
-                        maxCount === 3 ? ['red', 'green', 'blue'] :
-                        ['red', 'green', 'blue', 'yellow'];
+  const baseColors = ['blue', 'red', 'green', 'yellow'];
+  const host = hostColor || 'blue';
+  const idx = baseColors.indexOf(host);
+  
+  const clockwise = [
+    baseColors[idx],
+    baseColors[(idx + 1) % 4],
+    baseColors[(idx + 2) % 4],
+    baseColors[(idx + 3) % 4]
+  ];
+
+  const allowedColors = maxCount === 2 ? [clockwise[0], clockwise[2]] :
+                        maxCount === 3 ? [clockwise[0], clockwise[1], clockwise[2]] :
+                        clockwise;
 
   allowedColors.forEach(color => {
     const p = players.find(player => player.color === color);
